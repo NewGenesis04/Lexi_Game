@@ -5,35 +5,93 @@
 A modern, low-latency online Scrabble game. Monorepo with two packages: `game-engine` (pure, zero-dependency domain logic) and `backend-api` (FastAPI modular monolith). SSE for server-to-client pushes, HTTP POST for client actions. Dockerized on a single VPS.
 
 ---
+### Static System Architecture & Infrastructure
+                          ┌────────────────────────────────────────────────────────┐
+                          │                   Client (Web SPA)                     │
+                          │      EventSource (SSE) ◄───┐       │                   │
+                          └────────────────────────────┼───────┼───────────────────┘
+                                                        │       │ POST /moves (HTTP)
+                                                        │       ▼
+                          ┌────────────────────────────┼───────────────────────────┐
+                          │               Docker Container (FastAPI)               │
+                          │                                                        │
+                          │   routes/  ──►  services/  ──►  repositories/          │
+                          │                                      │                 │
+                          │   ┌────────────────────────┐         │                 │
+                          │   │  game-engine (Package) │         │                 │
+                          │   │  ───────────────────── │         │                 │
+                          │   │  • board | scoring     │         │                 │
+                          │   │  • bag | logic         │         │                 │
+                          │   │  • Pickled Frozenset   │         │                 │
+                          │   │    (Loaded in RAM)     │         │                 │
+                          │   └────────────────────────┘         │                 │
+                          │                                      │                 │
+                          │   ┌────────────────────────┐         │                 │
+                          │   │ In-Process SSE Manager │◄────────┤                 │
+                          │   │  • dict[code, Lock]    │         │                 │
+                          │   └────────────────────────┘         │                 │
+                          └──────────────────────────────────────┼─────────────────┘
+                                                                  │ Read / Write TCP
+                                                                  ▼
+                          ┌────────────────────────────────────────────────────────┐
+                          │               Docker Container (Redis)                 │
+                          │   • game:{code}       ──► GameState JSON               │
+                          │   • session:{token}   ──► PlayerSession JSON           │
+                          │   • active_games      ──► Set[code]                    │
+                          └────────────────────────────────────────────────────────┘
 
-                                      ┌─────────────────────────────────────┐
-                                      │         Client (Web SPA)            │
-                                      │  EventSource ← SSE | POST → HTTP    │
-                                      └──────────────┬──────────────────────┘
-                                                    │
-                                      ┌──────────────▼──────────────────────┐
-                                      │         backend-api (FastAPI)       │
-                                      │                                     │
-                                      │  routes/  →  services/  →  repos/  │
-                                      │                    │                │
-                                      │         ┌──────────▼──────────┐     │
-                                      │         │   game-engine       │     │
-                                      │         │   (pure, zero-dep)  │     │
-                                      │         │   board | scoring   │     │
-                                      │         │   bag | dawg loader │     │
-                                      │         │   TWL06 + CSW21     │     │
-                                      │         └─────────────────────┘     │
-                                      │                                     │
-                                      │  In-memory (no Redis at launch):    │
-                                      │   dict[code, GameState]             │
-                                      │   dict[code, asyncio.Lock]          │
-                                      │   dict[token, PlayerSession]        │
-                                      │   dict[code, asyncio.Task] (timer)  │
-                                      └─────────────────────────────────────┘
-                                                    │
-                                              Docker container
-                                                on $5 VPS
 
+
+## Sequential Data Flow
+                Client            Route           Service          Engine           Repo          SSE / Timer
+                  │                 │                │               │               │                 │
+                  │── POST /moves ─►│                │               │               │                 │
+                  │                 │── handle_move ─►│               │               │                 │
+                  │                 │                │──[Acquire Lock]               │                 │
+                  │                 │                │─── validate_move ────────────►│                 │
+                  │                 │                │◄─── [Returns True] ───────────│                 │
+                  │                 │                │─── apply_move ───────────────►│                 │
+                  │                 │                │◄─── [New GameState] ──────────│                 │
+                  │                 │                │                               │                 │
+                  │                 │                │─────── SET game:{code} ──────►│                 │
+                  │                 │                │                                                 │── Cancel / Spawn Task
+                  │                 │                │────────────────────────────────────────────────►│── Broadcast Sanitized
+                  │                 ◄─── Return 200 ─│                                                 │
+                  ◄── 200 OK ───────│                │                                                 │
+
+
+
+## Disconnect & Adjournment State Machine
+                                                ┌───────────────┐
+                                                │    CREATED    │
+                                                └───────┬───────┘
+                                                        │ Player Joins
+                                                        ▼
+                                                ┌───────────────┐
+                                                │    PLAYING    │◄────────────────────────────────┐
+                                                └───────┬───────┘                                 │
+                                                        │                                         │
+                                        Either Player   │ Disconnect                              │ Both Players
+                                        Socket Drops    │                                         │ Reconnect
+                                                        ▼                                         │
+                                                ┌───────────────┐                                 │
+                                                │   ADJOURNED   │─────────────────────────────────┘
+                                                │  DISCONNECT   │ (Freeze Turn Clock -> Save Remaining Secs)
+                                                └───────┬───────┘ (Spawn 5-Min asyncio.Task)
+                                                        │
+                                                        │ Last Connected Player Drops OR
+                                                        │ 5-Min Task Expires / Opponent Left
+                                                        ▼
+                                                ┌───────────────┐
+                                                │    PAUSED     │◄─── (Turn status flag to PAUSED)
+                                                └───────┬───────┘
+                                                        │
+                                                        │ 60-Sec Sweep Task checks:
+                                                        │ now() - updated_at > 30 mins
+                                                        ▼
+                                                ┌───────────────┐
+                                                │ GARBAGE WIPE  │ ──► (Evict keys from Redis)
+                                                └───────────────┘
 
 Key design bets:
 - All validation server-side in game-engine — no challenge mechanics needed
@@ -44,7 +102,7 @@ Key design bets:
 - Join-by-6-digit-code with nicknames; accounts added layer later
 - Three end conditions: spent time clock out, 6 consecutive passes, or bag empty + tile rack penalt
 
-## Decided Design (22 Questions)
+## Decided Design
 
 ### Q1. Tile Set
 **Decision:** Standard English (NASPA-style, 100 tiles, 15×15 board).
@@ -55,8 +113,8 @@ Key design bets:
 **Rationale:** User owns CSW21.txt already. Two dictionaries cover the vast majority of demand.
 
 ### Q3. Dictionary Loading
-**Decision:** Both DAWGs compiled at build-time and loaded at server startup.
-**Rationale:** Negligible memory (~5 MB total). No cold-start latency. Build script: `scripts/build_dawg.py`.
+**Decision:** Both dictionaries compiled into pickle'd `frozenset`s at build-time, loaded at server startup.
+**Rationale:** Correct by construction — no risk of AI-generated DAWG corruption. ~15 MB RAM per dictionary is negligible. See Q15 for full rationale.
 
 ### Q4. GameState Structure
 **Decision:** Sketch defined; details TBD during implementation. Fields include: board, bag, players, current_player_index, phase, move_history, dictionary, scores, consecutive_passes, last_move.
@@ -139,9 +197,9 @@ neo-scrabble/
 **Decision:** Server-generated opaque bearer token (SHA256 hex prefix). Stored in `dict[str, PlayerSession]`. Passed as `?token=` query param for SSE.
 **Rationale:** Simple, stateless-ish (session state on server). No JWT complexity at launch. Upgrade path: swap to JWT later.
 
-### Q15. DAWG Build Pipeline
-**Decision:** Build-time script (`scripts/build_dawg.py`). .dawg files committed to git.
-**Rationale:** Zero runtime overhead. ~300 KB per file. Load in milliseconds.
+### Q15. Dictionary Format
+**Decision:** Build-time script compiles lexicon into a pickle'd `frozenset`. Loaded at server startup via `pickle.load()`.
+**Rationale:** Correct by construction. O(1) lookup, ~15 MB RAM — negligible. No risk of AI-generated DAWG corruption. Serves as test oracle for a future migration to `pytries`/DAWG library if prefix queries become needed.
 
 ### Q16. Testing Strategy
 **Decision:** Three layers — unit tests for engine (pytest, 95% coverage); unit tests for API routes (httpx AsyncClient, mocked services); integration tests (full HTTP, real in-memory repo). Property-based tests (hypothesis) deferred to post-MVP.
@@ -170,6 +228,22 @@ neo-scrabble/
 - A player's time bank hits zero → auto-forfeit
 Ties: returned as-is, no tiebreaker logic.
 
+### Q22. Move Submission Schema
+**Decision:** Client sends an explicit list of tile placements:
+```json
+{
+  "type": "place",
+  "tiles": [
+    {"row": 7, "col": 7, "letter": "S"},
+    {"row": 7, "col": 8, "letter": "T"},
+    {"row": 7, "col": 9, "letter": "A"},
+    {"row": 7, "col": 10, "letter": "R"}
+  ]
+}
+```
+Blanks include `"letter": " ", "plays_as": "T"`. Engine validates adjacency, contiguity, and dictionary.
+**Rationale:** Explicit, unambiguous. Client already computes pixel positions for board preview.
+
 ### Q23. Redis Data Model
 **Decision:** Simple key-value with JSON strings (not Hashes). Two key namespaces:
 - `game:{code}` → serialized GameState JSON
@@ -189,18 +263,22 @@ Ties: returned as-is, no tiebreaker logic.
 **Decision:** A `sanitize_game_state(raw, requesting_player_id)` function strips the opponent's rack before data reaches **both** the HTTP response and the SSE broadcast. The SSE manager broadcasts per-recipient (one sanitized payload per player, not one raw broadcast).
 **Rationale:** Prevents rack leakage through either channel. If raw GameState is accidentally logged or broadcast, opponent tiles are never in the payload.
 
-### Q22. Move Submission Schema
-**Decision:** Client sends an explicit list of tile placements:
-```json
-{
-  "type": "place",
-  "tiles": [
-    {"row": 7, "col": 7, "letter": "S"},
-    {"row": 7, "col": 8, "letter": "T"},
-    {"row": 7, "col": 9, "letter": "A"},
-    {"row": 7, "col": 10, "letter": "R"}
-  ]
-}
-```
-Blanks include `"letter": " ", "plays_as": "T"`. Engine validates adjacency, contiguity, and dictionary.
-**Rationale:** Explicit, unambiguous. Client already computes pixel positions for board preview.
+### Q27. Disconnect State Machine — 5-Minute Grace Period
+**Decision:** Any disconnect (by either player) immediately freezes the active turn clock and triggers a 5-minute grace period. Game enters `PAUSED` state. Both players must reconnect for the game to resume. If 5 minutes elapse without full reconnection, forfeit: if exactly one player is online, they win; if both are offline, the game is garbage-collected as a draw after 30 minutes. On reconnect, the frozen clock resumes from `paused_time_left` (stored in Redis alongside `game:{code}`).
+**Rationale:** Simplifies the state machine — no distinction between "current player disconnected" vs "opponent disconnected during your turn." Eliminates clock-race conditions.
+
+### Q28. Double Disconnect
+**Decision:** When both players are disconnected, the game remains in `PAUSED` state. A background sweep task checks for paused games older than 30 minutes and garbage-collects them as draws.
+**Rationale:** No double-timer conflict. Games can't linger in Redis forever.
+
+### Q29. Disconnect Timer Semantics
+**Decision:** Each disconnect event gets a fresh 5-minute timer.
+**Rationale:** Simplest to reason about. Prevents "second disconnect has a tighter clock" confusion.
+
+### Q30. Reconnect UX
+**Decision:** On SSE re-establish, the server pushes `game_paused` event (if game is still paused) or `game_resumed` (if both players are back) over the fresh connection. No polling — the SSE stream is the source of truth.
+**Rationale:** Session token survives as long as the game exists; cleaned up on game end or 30-min sweep.
+
+### Q31. Session Token Lifetime
+**Decision:** Session lives as long as the game exists. Cleaned up when the game ends or garbage-collected.
+**Rationale:** Tokens are opaque random 32-char hex strings — no security concern from long lifetimes.
