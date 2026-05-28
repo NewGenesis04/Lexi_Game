@@ -165,10 +165,10 @@ neo-scrabble/
 │   │       ├── board.py        # Grid logic, placement validation
 │   │       ├── scoring.py      # Score calc, premium squares
 │   │       ├── bag.py          # Tile bag, draw, exchange
-│   │       ├── dawg.py         # DAWG loader/checker
-│   │       ├── dictionaries/   # Compiled .dawg files
+│   │       ├── dictionary.py   # Frozenset loader/checker
+│   │       ├── dictionaries/   # Compiled .pkl files
 │   │       └── scripts/
-│   │           └── build_dawg.py
+│   │           └── build_dictionary.py
 │   └── backend-api/
 │       ├── pyproject.toml
 │       └── src/backend_api/
@@ -214,8 +214,8 @@ neo-scrabble/
 **Rationale:** No polling, no cron drift. Lightest-weight approach.
 
 ### Q19. Frontend
-**Decision:** Web SPA (framework TBD).
-**Rationale:** SSE is native to browsers. SSE event schema is kept client-agnostic.
+**Decision:** Vue 3 SPA.
+**Rationale:** SSE is native to browsers via `EventSource`. Vue's reactivity model maps cleanly onto full-state SSE pushes — each event replaces the reactive game state object and the board re-renders automatically.
 
 ### Q20. Deployment
 **Decision:** Docker container on a VPS (single box, Dockerfile in backend-api/).

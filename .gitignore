@@ -1,4 +1,9 @@
-.venv\
-__pycache__\
+.venv/
+__pycache__/
 *.pyc
 .env
+pyrightconfig.json
+.pytest_cache/
+dist/
+*.egg-info/
+packages/game-engine/src/game_engine/dictionaries/*.pkl
