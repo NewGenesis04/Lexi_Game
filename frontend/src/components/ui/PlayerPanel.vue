@@ -38,7 +38,7 @@ const dotState = computed(() => {
 <template>
   <div
     class="w-44 flex-shrink-0"
-    :style="{ opacity: connected !== false ? 1 : 0.5 }"
+    :style="{ opacity: connected !== false ? 1 : 0.5, transition: 'opacity 0.3s' }"
   >
     <div
       :style="{
