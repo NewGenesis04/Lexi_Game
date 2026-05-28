@@ -4,252 +4,277 @@
 
 NEO Scrabble is a real-time multiplayer Scrabble web app. Two players, one board, turn-based. The frontend is a Vue 3 SPA driven entirely by server state pushed over SSE — the UI is "dumb," it only renders what the server says.
 
+---
+
 ## Visual Identity
 
-**Mood:** Premium, dark-first, depth-rich. Think luxury game set meets modern fintech dashboard. Gradients, shadows, glass morphism, and smooth animations create a tactile, immersive feel. Every surface has intentional depth.
+**Mood:** Premium, dark-first, warm-toned. Think artisan tabletop craft meets modern fintech dashboard. The palette is built around brass, walnut, and copper with deep shadows and subtle glass/inset effects. Every surface has intentional depth.
 
-**Theme reference (Dark — default):**
+**Typography — layered approach:**
 
-```
-Board background:  neutral-800 (#262626)
-Cell normal:       neutral-800
-Cell DL:           blue-900
-Cell TL:           blue-950
-Cell DW:           rose-900
-Cell TW:           red-950
-Center star:       rose-900
-Tile (occupied):   neutral-700 with glossy amber gradient
-Tile letter:       white with subtle text shadow
-Ghost tile:        green-700/800 with emerald-400 border, scale pulse
-Border lines:      neutral-600
-Page background:   neutral-900 (#171717)
-Card/surface:      neutral-800/900 with backdrop blur
-Text primary:      white
-Text secondary:    neutral-400
-Accent blue:       blue-600 (#2563eb)
-Accent red:        red-700
-Rack tile:         amber-100/200 gradient bg, neutral-900 text
-```
+| Context | Font | Weight(s) | Notes |
+|---------|------|-----------|-------|
+| Page body / board letters / headings | **EB Garamond** (serif) | 400, 500, 600 | Primary personality — warm, literary |
+| UI labels / buttons / table headers | **Work Sans** (sans-serif) | 700, 600 | UP100, 0.1em tracking |
+| Player panel name / score / labels | **System UI stack** (`system-ui, -apple-system, sans-serif`) | 700 / 900 | Panels match Bloomberg-standard spec |
+| Clock readout | **SF Mono / JetBrains Mono** (monospace) | 700 | `tabular-nums` for stable alignment |
 
-Typography: System font stack (Inter or SF Pro), no custom typefaces. Headings bold and tight-tracked. UI labels in uppercase with wider letter-spacing. Buttons use bold, modern typography.
+**Palette reference ("Artisan Tabletop" — the only theme in the prototype):**
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `surface` | `#131313` | Page background |
+| `surface-container-lowest` | `#0e0e0e` | Deepest surface |
+| `surface-container-low` | `#1b1c1c` | Header, board inset |
+| `surfaceContainer` | `#202020` | Mid container |
+| `surface-container-high` | `#2a2a2a` | Tile rack default |
+| `surface-container-highest` | `#353535` | Rack hover |
+| `onSurface` | `#e5e2e1` | Primary text |
+| `on-surface-variant` | `#d3c3c0` | Secondary text |
+| `outline` | `#9c8d8b` | Brass border |
+| `outline-variant` | `#504442` | Subtle border |
+| `primary` | `#e3beb8` | Brass/copper accent |
+| `on-primary` | `#422a26` | Text on primary |
+| `primary-container` | `#3e2723` | Dark walnut (DW cells, lobby bg) |
+| `secondary` | `#d6c3bc` | Neutral accent |
+| `tertiary` | `#ffb5a0` | Alert/forfeit accent |
+| `tertiary-container` | `#5a1200` | Forfeit button bg |
+| `primary-fixed-dim` | `#e3beb8` | Rack selected gradient |
+| Board DL bg | `#1e405a` | Cool blue |
+| Board DL label | `#7ab8d4` | Light blue |
+| Board TL bg | `#0e2433` | Dark blue |
+| Board TL label | `#5a9ec4` | Mid blue |
+| Board DW / ★ bg | `primary-container` (`#3e2723`) | Dark walnut |
+| Board DW / ★ label | `primary-fixed-dim` (`#e3beb8`) | Brass |
+| Board TW bg | `#3d1414` | Dark crimson |
+| Board TW label | `#d47a7a` | Light red |
+| Placed tile bg | `#d4c5a9` | Warm beige |
+| Placed tile letter | `#1a1a1a` | Near-black |
+
+---
 
 ### Premium Design System
 
 #### Depth & Layers
-- Board: rounded corners (rounded-xl), `shadow-2xl` with dark drop shadow
-- Cards: glass morphism — semi-transparent bg, `backdrop-blur-xl`, subtle border
-- Tiles: glossy gradients with inner shadow illusion, `shadow-lg` per tile
-- Interactive elements: `hover:scale-105` with `transition-all duration-200`
+- **Board container:** 2px brass border (`colors.outline`), `linear-gradient(180deg, #131313 → #1b1c1c)` bg, `0 6px 24px rgba(0,0,0,0.6)` drop shadow + `inset 0 1px 0 rgba(255,255,255,0.06)` highlight
+- **Board cells:** `1px` solid border, `inset 0 1px 2px rgba(0,0,0,0.3)` shadow, `box-sizing: border-box`
+- **Placed tiles:** `0 2px 6px rgba(0,0,0,0.5)` drop shadow, warm beige bg with dark lettering + light text-shadow
+- **Rack tiles:** Overshoot cubic-bezier hover lift (`translateY(-3px) scale(1.06)`), selected lifted further (`-6px`) with primary ring
+- **Player panels:** Semi-transparent `rgba(38,38,38,0.4)` bg, subtle `rgba(96,96,96,0.3)` border, separated into vertical blocks
+- **Cards/Cards:** Glass morphism via semi-transparent bg on dark, subtle border
+
+#### Premium Square Colours
+Premium squares do NOT use gradients. Each type gets a solid deep background with a contrasting muted label:
+
+| Square | Background | Label Colour |
+|--------|-----------|-------------|
+| DL (×2 letter) | `#1e405a` (cool navy) | `#7ab8d4` (light blue) |
+| TL (×3 letter) | `#0e2433` (deep navy) | `#5a9ec4` (mid blue) |
+| DW (×2 word) | `#3e2723` (dark walnut) | `#e3beb8` (brass) |
+| TW (×3 word) | `#3d1414` (dark crimson) | `#d47a7a` (light red) |
+| ★ (center) | `#3e2723` (dark walnut) | `#e3beb8` (brass) |
+
+Labels rendered in Work Sans, 8px, 700 weight, 0.1em tracking.
 
 #### Gradients
-- Board premium cells: subtle diagonal gradients per type (DL: blue, TL: deeper blue, DW: rose, TW: red)
-- Occupied tiles: amber gradient (`from-amber-200 to-amber-100`)
-- Rack background: amber gradient with `backdrop-blur`
-- Action buttons: blue-600 with hover brightening
-- Game over title: gradient text (`from-white via-blue-300 to-white`)
-- Lobby title: rainbow gradient text
-
-#### Glass Morphism
-- Player panels: `bg-neutral-800/80 backdrop-blur-xl` with subtle border
-- Notification bar: `bg-neutral-900/90 backdrop-blur-xl`
-- Game over overlay: `bg-neutral-900/80 backdrop-blur-2xl`
-- Lobby card: `bg-neutral-800/80 backdrop-blur-xl`
+- Board container: subtle diagonal/vertical from `surface-dim` to `surface-container-low`
+- Rack tiles: `linear-gradient(180deg, surface-container-high → surfaceContainer)` default, primary gradient when selected
+- Action buttons: `linear-gradient(180deg, outline → #8a7d7b)` for submit/create/join
+- Rack background: `linear-gradient(180deg, surface-container-low → surfaceContainer)`
 
 #### Shadows
-- Board: `shadow-2xl` with `shadow-black/50`
-- Tiles: `shadow-lg` with `shadow-black/30`
-- Cards: `shadow-xl` with `shadow-black/40`
-- Buttons: `shadow-md` with hover elevation
-- Dropdowns: `shadow-2xl` with `shadow-black/60`
+- Board container: `0 6px 24px rgba(0,0,0,0.6)` + `inset 0 1px 0 rgba(255,255,255,0.06)`
+- Cells: `inset 0 1px 2px rgba(0,0,0,0.3)` (empty), `0 2px 6px rgba(0,0,0,0.5)` (occupied)
+- Rack tiles: `0 1px 3px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.08)` (default); `0 4px 12px` (hovered); `0 2px 8px` + `0 0 0 1px primary` (selected)
+- Player panels: none (only the thin border)
+- Buttons: `0 2px 4px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.15)` for filled; none for outlined
+- Card/lobby: `0 2px 8px rgba(0,0,0,0.5)`
 
 #### Animations
-- Tile hover: `hover:scale-110 hover:-translate-y-1` with smooth transition
-- Ghost tiles: subtle scale pulse (CSS keyframe)
-- Button hover: `hover:scale-105` with brightness increase
-- Notification entrance: slide from left
-- Game overlay entrance: fade + scale
-- Selection ring: smooth border transition
+- Rack tile hover: `translateY(-3px) scale(1.06)` with `cubic-bezier(0.34, 1.56, 0.64, 1)`, 200ms
+- Rack tile selected: `translateY(-6px)` same curve
+- Notification bar: `slideUp` keyframe (translateY 100%→0 + opacity), 250ms
+- Game over overlay: `fadeIn` (opacity 0→1 + scale 0.95→1), 400ms
+- Connection dot: `pulse` keyframe (opacity 1→0.4→1, 2s infinite) for connected-but-not-turn
 
 ---
 
 ## Screen 1: Lobby (Create / Join)
 
-A centered glass-morphism card on a neutral-900 page. No header. Just the card floating in dark space.
+A centered card on a `#131313` page with no header. Just the card floating in dark space.
 
 **Layout:**
-- Centered card, max ~420px wide, `bg-neutral-800/80 backdrop-blur-xl` with subtle border, `rounded-2xl shadow-2xl`
-- Title "NEO SCRABBLE" at top — large, bold, tracking-widest. Gradient text: `bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent`
-- Two tab buttons below: "Create" | "Join" — pill-style, active tab has gradient fill (`from-blue-600 to-blue-700`), inactive is muted outline with `hover:bg-neutral-700/50`
-- Form fields below the active tab, vertically stacked with generous gap
-- Create tab: nickname input (enhanced with `ring-1 ring-neutral-600 focus:ring-2 focus:ring-blue-500` and `bg-neutral-700/50`), dictionary dropdown, time limit dropdown, submit button (full-width, gradient `from-blue-600 to-blue-700`, `shadow-lg`, `hover:scale-[1.02]`)
-- Join tab: game code input (6-char, centered text, monospace, larger font), nickname input, submit button (green gradient `from-emerald-600 to-green-700`)
-- Submit buttons say "Creating…" / "Joining…" with a subtle spinner when loading, disabled state dims with `opacity-60`
+- Centered card, max `400px` wide, `background: #3e2723` (primary-container), `1px solid #9c8d8b` (outline) border, `0 2px 8px rgba(0,0,0,0.5)`, `rounded-lg`, padding 32px
+- Title "NEO SCRABBLE" — EB Garamond, 32px, 500 weight, `color: #e3beb8` (primary), centered
+- Two tab buttons below in a segmented control: `background: #0e0e0e` (surface-container-lowest), 2px padding
+  - Active tab: `background: #9c8d8b` (outline), text `#0e0e0e`, Work Sans, 700, 0.1em tracking, uppercase
+  - Inactive tab: transparent bg, text `#d3c3c0` (on-surface-variant)
+- Form fields inside the active tab vertically stacked with generous gap
+  - Inputs: `background: #0e0e0e`, `1px solid #504442` border, `inset 0 2px 4px rgba(0,0,0,0.5)` shadow, EB Garamond 18px or Work Sans 12px
+  - Selects: same styling as inputs
+  - Submit button: `linear-gradient(180deg, #9c8d8b → #8a7d7b)`, text `#0e0e0e`, Work Sans 12px 700, 0.1em tracking, `0 2px 4px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.15)`, full-width
 - No decorative elements. Pure typography, spacing, and material depth.
-
-**States:**
-- Error: inline red text below the form with subtle shake, or the global notification bar at the bottom
-- Loading: button shows spinner, fields disabled with reduced opacity
-- Empty: just the card, waiting for user input
 
 ---
 
 ## Screen 2: Game Board (Main Play Screen)
 
-This is the core screen. It must feel like a premium physical board game — depth, gloss, and tactile feedback.
+The core screen. Must feel like a premium physical board game — depth, gloss, and tactile feedback.
 
 **Overall Layout:**
 
 ```
-┌──────────────────────────────────────────────────┐
-│ Header                        Theme  Leave        │
-├──────────────────────────────────────────────────┤
-│                                                   │
-│   ┌──────┐          ┌──────────┐    ┌──────┐     │
-│   │Player│          │  BOARD   │    │Player│     │
-│   │Panel │          │  15×15   │    │Panel │     │
-│   │(opp) │          │ premium  │    │(you) │     │
-│   └──────┘          │ squares  │    └──────┘     │
-│                     │ visible  │                   │
-│                     └──────────┘                   │
-│                     ┌──────────┐                   │
-│                     │ TILE     │                   │
-│                     │ TRAY     │                   │
-│                     │ (rack)   │                   │
-│                     └──────────┘                   │
-│                     ┌──────────┐                   │
-│                     │ CONTROLS │                   │
-│                     │ (buttons)│                   │
-│                     └──────────┘                   │
-│                                                   │
-├──────────────────────────────────────────────────┤
-│  Notification Feed (chats, game events, errors)   │
-└──────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│ Header                          Theme    Leave        │
+├──────────────────────────────────────────────────────┤
+│                                                        │
+│   ┌──────┐               ┌──────────┐   ┌──────┐      │
+│   │Player│     Bag(◉)    │  BOARD   │   │Player│      │
+│   │Panel │               │  15×15   │   │Panel │      │
+│   │(opp) │               │ premium  │   │(you) │      │
+│   └──────┘               │ squares  │   └──────┘      │
+│                          │ visible  │                  │
+│                          └──────────┘                  │
+│                          ┌──────────┐                  │
+│                          │ TILE     │                  │
+│                          │ TRAY     │                  │
+│                          │ (rack)  ⇄│  (shuffle btn)   │
+│                          └──────────┘                  │
+│                          ┌──────────┐                  │
+│                          │ CONTROLS │                  │
+│                          │ (buttons)│                  │
+│                          └──────────┘                  │
+│                                                        │
+├────────────────────────────────────────────────────────┤
+│              Notification Bar (fixed overlay)           │
+└────────────────────────────────────────────────────────┘
 ```
 
-On wide screens: board is centered, player panels flank left/right.
-On narrow screens: player panels go top/bottom, everything stacks vertically.
+On wide screens (lg+): board centered, player panels flank left/right in `flex-row`.
+On narrow screens: everything stacks vertically in `flex-col`, panels go top/bottom.
 
 ### Header
-- Left: game code in monospace, muted
-- Right: "Theme" text button (opens the theme swatch dropdown with glass morphism panel), "Leave" red button (gradient `from-red-700 to-red-800`)
+- Left: "GAME · XY7K9M" — Work Sans, 12px, 700, 0.1em tracking, `color: #d3c3c0` (on-surface-variant)
+- Right:
+  - "Theme" text button — Work Sans 12px 700, `color: #d6c3bc` (secondary), `1px solid #9c8d8b` outline, transparent bg, hover fills to `#2a2a2a`
+  - "Leave" — Work Sans 12px 700, `background: #5a1200` (tertiary-container), text `#ffb5a0` (tertiary), `0 2px 4px rgba(0,0,0,0.3)`, hover dims
 
-### Player Panel (×2 — opponent top/left, you bottom/right)
-A compact card, ~180px wide, glass morphism:
-- `bg-neutral-800/60 backdrop-blur-xl rounded-xl border border-neutral-700/50 shadow-xl`
-- Name (semibold, white, `tracking-wide`)
-- Score (extra-large, bold, gradient text `from-blue-400 to-blue-300 bg-clip-text text-transparent`)
-- Time remaining (monospace, muted: "5:32" format)
-- Connection indicator: green glowing dot (`ring-2 ring-green-500/50 ring-offset-2 ring-offset-neutral-900`) if connected, red if disconnected, gray if waiting
-- "● Your Turn" / "● Their Turn" badge: `bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full px-3 py-0.5 text-xs font-semibold`
+### Player Panel (×2 — opponent left/top, you right/bottom)
+A compact card, `w-44` (176px), with the following structure:
+
+```
+┌─────────────────────────────┐  ← emerald 2px top border if active turn
+│  ● Player Name              │     otherwise 1px standard border
+│─────────────────────────────│
+│                             │
+│          137                │  ← 36px, 900 weight, tabular-nums
+│                             │
+│─────────────────────────────│
+│  TIME              5:42     │  ← micro label 9px / mono 15px
+└─────────────────────────────┘
+```
+
+- `background: rgba(38,38,38,0.4)`
+- `border: 1px solid rgba(96,96,96,0.3)`
+- Active turn: `borderTop: 2px solid #10b981` (emerald)
+- Inactive/disconnected: `opacity: 0.5` (disconnected only)
+- System font stack throughout (`system-ui, -apple-system, sans-serif`)
+- Separator lines: `1px solid rgba(96,96,96,0.2)`
+- Connection dot: 6px circle
+  - **Green** (`#10b981`) + glow: active turn + connected
+  - **Pulsing emerald** (`#34d399`) + pulsing: connected but not turn
+  - **Muted gray** + no glow: disconnected
+- Name: 14px, 700 weight, `#e5e5e5`, `-0.02em` tracking
+- Score: 36px, 900 weight, white, `-0.03em` tracking, `font-variant-numeric: tabular-nums`
+- "TIME" label: 9px, 900 weight, `#6b7280`, `0.15em` tracking
+- Clock: SF Mono / JetBrains Mono, 15px, 700 weight, `#a3a3a3` (`#ffb5a0` when < 60s)
+
+### Bag Indicator
+A standalone pill badge positioned above the board:
+- `background: rgba(38,38,38,0.4)`, `border-radius: 999px`, `border: 1px solid rgba(96,96,96,0.3)`
+- Contains `bag.svg` icon (16×16) + remaining tile count in system font 12px 700
 
 ### Board (15×15 Grid)
-- The board is the visual anchor. `rounded-2xl shadow-2xl shadow-black/50 border-2 border-neutral-600 p-1`
-- Cells are 36×36px on desktop (labelled with row numbers 1–15 and column letters A–O on all four sides)
-- Premium squares show their label (DL, TL, DW, TW, ★) in muted colored text when empty, with soft gradient backgrounds:
-  - DL: `bg-gradient-to-br from-blue-900 to-blue-950` with `text-blue-300`
-  - TL: `bg-gradient-to-br from-blue-950 to-indigo-950` with `text-blue-400`
-  - DW: `bg-gradient-to-br from-rose-900 to-rose-950` with `text-rose-300`
-  - TW: `bg-gradient-to-br from-red-950 to-rose-950` with `text-red-400`
-  - ★: `bg-gradient-to-br from-rose-900 to-rose-950` with `text-rose-300`
-- When a tile is placed: glossy tile appearance with gradient `from-amber-200 to-amber-100`, bold white letter with subtle `text-shadow`, small point value displayed bottom-right in tiny muted text
-- Ghost tiles (pending placement): `bg-gradient-to-br from-emerald-800 to-green-700` with `border-2 border-emerald-400`, `shadow-lg shadow-emerald-900/50`, subtle scale animation, letter in white
-- Tile appearance: `rounded-md shadow-lg shadow-black/30` with glossy finish
-- Hover effects on empty cells when a rack tile is selected: `hover:brightness-125 hover:scale-105 transition-all`
-- Point value displayed as subscript on placed tiles (e.g., "A₁")
+The visual anchor.
+- **Container:** `border-radius: 0.625rem`, `border: 2px solid #9c8d8b`, `background: linear-gradient(180deg, #131313 → #1b1c1c)`, `box-shadow: 0 6px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)`, padding 8px
+- **Cells:** 36×36px (w-9 h-9), each wrapped in a 1px padding cell (`p-[1px]`)
+  - `box-sizing: border-box` on the inner cell div
+  - `border: 1px solid ...` (outline-variant for empty, outline for occupied)
+  - `border-radius: 0.125rem`
+  - Empty cells: `inset 0 1px 2px rgba(0,0,0,0.3)` shadow
+  - Occupied cells: `0 2px 6px rgba(0,0,0,0.5)` shadow
+- **Premium labels:** Work Sans 8px 700, shown only when cell is empty
+- **Placed tiles:** warm beige (`#d4c5a9`) bg, EB Garamond 18px 600 letter in `#1a1a1a` with `0 1px 0 rgba(255,255,255,0.3)` text-shadow, points in Work Sans 8px at bottom-right in `#5a4a3a`
+- **Labels:** Row numbers (1–15) and column letters (A–O) on all four sides in Work Sans 12px 700
 
 ### Tile Tray (Rack)
-- A sleek horizontal strip below the board, `bg-gradient-to-r from-amber-900/30 via-amber-800/20 to-amber-900/30 backdrop-blur-xl rounded-xl p-1 shadow-lg`
-- 7 tile slots, each tile is 42×42px, glossy 3D appearance:
-  - `bg-gradient-to-br from-amber-200 to-amber-100` with `shadow-lg shadow-black/30 rounded-lg`
-  - Letter in bold `text-neutral-900`, large (`text-lg`)
-  - `hover:scale-110 hover:-translate-y-2 transition-all duration-200 cursor-pointer`
-- Selected tile: `ring-2 ring-blue-400 ring-offset-2 ring-offset-amber-100 -translate-y-3 scale-110`
-- Swap-marked tile: `bg-gradient-to-br from-yellow-400 to-amber-400 scale-110 ring-2 ring-yellow-300`
-- Ghost-used tile (already placed on board): `opacity-40 scale-90 pointer-events-none`
-- Blanks show "?" as the letter
-- Empty rack shows placeholder text centered in the strip
+A sleek horizontal strip below the board:
+- `background: linear-gradient(180deg, #1b1c1c → #202020)`, `border-radius: 0.375rem`, `border: 1px solid #504442`, `inset 0 1px 2px rgba(0,0,0,0.3)`, padding 6px
+- 7 tile slots + 1 shuffle button, flex row with 6px gap
+- Each tile: 44×44px
+  - Default: `linear-gradient(180deg, #2a2a2a → #202020)`, `1px solid #504442`, `0 1px 3px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.08)`
+  - Hovered: `translateY(-3px) scale(1.06)`, gradient `#353535 → #2a2a2a`, `0 4px 12px rgba(0,0,0,0.5)` + `inset 0 1px 0 rgba(255,255,255,0.12)`
+  - Selected: `translateY(-6px)`, gradient `#e3beb8 → #e3beb8`, emerald ring `0 0 0 1px #e3beb8`, `0 2px 8px rgba(0,0,0,0.5)` + `inset 0 1px 0 rgba(255,255,255,0.15)`, border becomes `#e3beb8`
+  - Transition: `all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)` (overshoot spring)
+- Letter: EB Garamond, 20px, 600 weight; default `#d3c3c0` with `0 1px 2px rgba(0,0,0,0.5)` text-shadow; selected `#422a26` (on-primary)
+- Points: Work Sans, 8px, 600; default `#9c8d8b`; selected `#422a26`
+- **Shuffle button:** 36×36px, transparent bg, `1px solid #504442` border, `border-radius: 0.375rem`, cross-arrows SVG icon in `#9c8d8b`, hover dims to 70% opacity
 
-### Controls (below tile tray)
-A horizontal row of buttons, compact, all same height (~34px), `gap-2`:
-- **Submit** — gradient `from-blue-600 to-blue-700`, `shadow-md`, `hover:shadow-lg hover:scale-105`, appears only when tiles are placed or swap-selected, says "Submit" or "Swap" contextually
-- **Clear** — `bg-neutral-700/80 hover:bg-neutral-600`, appears only when ghost tiles exist
-- **Swap** — `bg-neutral-700/80 hover:bg-neutral-600`, toggles swap mode (yellow tint when active: `bg-yellow-700`)
-- **Pass** — `bg-neutral-700/80 hover:bg-neutral-600`
-- **Forfeit** — gradient `from-red-700 to-red-800`, `hover:scale-105`
-
-Consider hiding Pass/Forfeit behind a dotted "⋯" meatball menu to keep the main row clean. The Submit button should be the most visually prominent.
-
-### Interaction States
-- Resting: all controls visible but muted
-- Placing tiles: tile in rack is selected (blue ring with lift), empty board cells are hoverable (scale + brightness), placing creates a ghost tile with emerald glow
-- Swap mode: swap button highlighted yellow, clicking rack tiles marks them for exchange with yellow gradient
-- Blank tile placed: a floating 26-letter grid picker appears near the tile with glass morphism, selecting a letter assigns it with a snap transition
-- Submitting: button shows "Submitting…", all inputs locked with dimmed opacity
+### Controls (below tile rack)
+A horizontal row of 5 buttons, `gap-2`, `items-center justify-center`:
+- **Submit** — `linear-gradient(180deg, #9c8d8b → #8a7d7b)`, text `#0e0e0e`, `0 2px 4px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.15)`, `border-radius: 0.25rem`, padding 8px 20px, Work Sans 12px 700, hover dims
+- **Clear / Swap / Pass** — transparent bg, `1px solid #504442`, text `#d3c3c0`, padding 8px 16px, hover fills to `#2a2a2a`
+- **Forfeit** — `background: #5a1200`, text `#ffb5a0`, `1px solid #ffb5a0`, `0 2px 4px rgba(0,0,0,0.3)`, hover dims
 
 ---
 
 ## Screen 3: Game Over
 
-When `game.phase === 'finished'`, the board remains visible but a centered overlay appears (`bg-neutral-900/80 backdrop-blur-2xl`).
+When game phase is 'finished', the board remains visible but a centered overlay appears.
 
 **Overlay card:**
-- Centered, `bg-neutral-800/90 backdrop-blur-xl rounded-2xl border border-neutral-700/50 shadow-2xl shadow-black/50`, padding generous
-- "GAME OVER" in all-caps, extra-bold, tracking-widest. Gradient text: `bg-gradient-to-r from-white via-blue-300 to-white bg-clip-text text-transparent`
-- Winner name + final score: large, bold, gradient `from-yellow-400 to-amber-300`
-- "Final scores:" with both players' names and scores listed. Each score in its own glass card: `bg-neutral-700/50 backdrop-blur-sm rounded-lg border border-neutral-600/30`
-- "Play Again" button (gradient `from-blue-600 to-blue-700`, `shadow-lg`, `hover:scale-105`)
-- Tiles on the board stay in place beneath the overlay (faded but visible)
-- Entrance animation: `animate-fadeIn` with slight scale
-
-If a tie: "DRAW — No winner" in gradient text instead of a winner name.
+- `background: rgba(19,19,19,0.9)`, full-screen fixed, flex centered
+- Card: `background: #1b1c1c` (surface-container-low), `border-radius: 0.5rem`, `border: 1px solid #9c8d8b`, `0 4px 24px rgba(0,0,0,0.6)`, padding 32px, max-width 360px
+- "GAME OVER" — EB Garamond 32px 600, `color: #d3c3c0`
+- Winner name — EB Garamond 28px 500, `color: #e3beb8` (primary)
+- Winner score — Work Sans 36px 600, `color: #e5e2e1`
+- Final scores section:
+  - Each player row: `background: #202020` (surfaceContainer), `1px solid #504442`, `border-radius: 0.375rem`, flex row with name (EB Garamond 18px) and score (Work Sans 24px 600)
+  - Winner score: `color: #e3beb8` | Loser score: `color: #ffb5a0`
+- "Play Again" button — same gradient brass style as Submit
 
 ---
 
-## Persistent UI: Notification Bar (Bottom)
+## Notification Bar (Fixed Overlay)
 
-A fixed bar at the very bottom of the screen, spanning full width, ~56px tall.
-
-- `bg-neutral-900/90 backdrop-blur-xl border-t border-neutral-700/50 shadow-2xl shadow-black/30`
-- Notifications slide in from the left edge of this bar with `transition-all duration-500`
-- Each notification is a short text message with an icon/color: error (red), info (neutral), success (green)
-- Notifications auto-dismiss after 5 seconds with a smooth fade
-- Chats from opponent appear here too (future feature)
-- The bar is always visible but empty when no notifications exist (small empty state dot or just empty)
-
-Example messages:
-- "Game not found — redirected to lobby" (error, red)
-- "Opponent played STARE for 24 points" (info, neutral)
-- "You played STAR for 12 points" (info, neutral)
-- "Connected" (success, green)
-- "Opponent disconnected — game paused" (warning, yellow)
+A fixed bar at the very bottom of the screen, spanning full width, ~30px tall.
+- `background: #1b1c1c` (surface-container-low), `border-top: 1px solid #504442` (outline-variant)
+- `fixed bottom-0 left-0 right-0 z-50`
+- Appears with `slideUp` animation (250ms, translateY 100% → 0)
+- Auto-cycles through 3 notification types every 3.5s:
+  1. Self-move: "**You** played **STARE** +24" (dot: `#e3beb8`)
+  2. Opponent-move: "**Jax** played **QUITE** +18" (dot: `#d6c3bc`)
+  3. Connected: "**Jax** connected" (dot: `#4caf50`)
+- Click to dismiss
+- Hidden when no notification is active
+- Text: system font 12px, `color: #d3c3c0` with bold user names in `#e5e2e1`
+- Does NOT push content — overlays as fixed layer
 
 ---
 
 ## Persistent UI: Settings Panel
 
-Triggered by clicking "Theme" in the header. Opens as a small dropdown panel from the header with glass morphism.
-
-**Theme Picker (existing):**
-- 3-column grid of color swatches in a `bg-neutral-800/90 backdrop-blur-xl rounded-xl border border-neutral-700/50 shadow-2xl` panel
-- Each swatch is a 48×32px rectangle showing the board bg with a 2px border, `rounded-lg`
-- Active theme has a blue-500 ring with `shadow-md`
-- Theme name below each swatch in tiny text
-- Clicking applies immediately with a smooth transition
-
-**Future settings (placeholder):**
-- Dictionary toggle
-- Time limit
-- Sound on/off
-- These are grayed out with "Coming soon" label
+(The prototype has a "Theme" button in the header but no dropdown panel yet — placeholder for future.)
 
 ---
 
 ## Design Principles
 
 1. **The board is king.** Everything else is chrome. The board should feel like a premium physical object on a dark felt table — depth, shadow, and gloss make it tangible.
-2. **One action per tap.** Never ask the user to confirm. Submit sends immediately. Swap sends immediately. Clear is instant.
+2. **One action per tap.** Never ask the user to confirm. Submit sends immediately. Clear is instant.
 3. **Silence is the interface.** Empty states are just dark space. No spinners unless loading. No toasts unless something happened.
-4. **Notifications are a ticker, not a popup.** They live in the bottom bar. They don't interrupt. They don't block.
-5. **Premium squares whisper.** The board tells you where you are through color and subtle gradients, not through labels screaming at you.
-6. **Dark by default, light optional.** The "Dark" theme is the default. Themes remain available for those who want them but the premium gradient system is designed for the dark theme.
-7. **Depth serves clarity.** Shadows, gradients, and glass effects are not decoration — they create hierarchy and guide the eye to the board and tiles.
+4. **Notifications are a ticker, not a popup.** They live in a slim fixed bar at the bottom. 30px, auto-dismiss, click to dismiss. They don't interrupt.
+5. **Premium squares whisper.** The board tells you where you are through colour and subtle labels, not through screaming bright badges.
+6. **Warmth over coldness.** The palette uses warm brass, walnut, and copper tones rather than cool blues/greys. This creates a tactile, physical-game feel.
+7. **Depth serves clarity.** Shadows, gradients, and inset effects are not decoration — they create hierarchy and guide the eye to the board and tiles.
+8. **Connection state is explicit.** Green = your turn, pulsing emerald = connected (waiting), gray = disconnected. Tells the player exactly what's happening.

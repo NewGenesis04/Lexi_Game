@@ -59,7 +59,7 @@ async function handleForfeit() {
     <button
       v-if="hasPlacements || hasSwaps"
       :disabled="loading"
-      class="rounded bg-blue-600 px-4 py-2 text-sm font-medium transition hover:bg-blue-700 disabled:opacity-50"
+      class="btn btn--submit"
       @click="handleSubmit"
     >
       {{ loading ? 'Submitting...' : hasPlacements ? 'Submit' : 'Swap' }}
@@ -67,13 +67,13 @@ async function handleForfeit() {
     <button
       v-if="hasPlacements"
       :disabled="loading"
-      class="rounded bg-neutral-600 px-3 py-2 text-sm transition hover:bg-neutral-500 disabled:opacity-50"
+      class="btn btn--outline"
       @click="emit('clear')"
     >
       Clear
     </button>
     <button
-      :class="swapMode ? 'rounded bg-yellow-600 px-3 py-2 text-sm transition hover:bg-yellow-700' : 'rounded bg-neutral-600 px-3 py-2 text-sm transition hover:bg-neutral-500'"
+      :class="['btn', swapMode ? 'btn--swap-active' : 'btn--outline']"
       :disabled="loading || hasPlacements"
       @click="emit('toggleSwap')"
     >
@@ -81,17 +81,73 @@ async function handleForfeit() {
     </button>
     <button
       :disabled="loading"
-      class="rounded bg-neutral-600 px-3 py-2 text-sm transition hover:bg-neutral-500 disabled:opacity-50"
+      class="btn btn--outline"
       @click="handlePass"
     >
       Pass
     </button>
     <button
       :disabled="loading"
-      class="rounded bg-red-700 px-3 py-2 text-sm transition hover:bg-red-800 disabled:opacity-50"
+      class="btn btn--forfeit"
       @click="handleForfeit"
     >
       Forfeit
     </button>
   </div>
 </template>
+
+<style scoped>
+.btn {
+  border-radius: 0.25rem;
+  padding: 8px 16px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn--submit {
+  padding: 8px 20px;
+  background: linear-gradient(180deg, var(--color-outline), #8a7d7b);
+  color: var(--color-surface-container-lowest);
+  box-shadow: var(--shadow-button-filled);
+}
+.btn--submit:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.btn--outline {
+  background: transparent;
+  color: var(--color-on-surface-variant);
+  border: 1px solid var(--color-outline-variant);
+}
+.btn--outline:hover:not(:disabled) {
+  background: var(--color-surface-container-high);
+}
+
+.btn--swap-active {
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+.btn--swap-active:hover:not(:disabled) {
+  background: rgba(227, 190, 184, 0.1);
+}
+
+.btn--forfeit {
+  background: var(--color-tertiary-container);
+  color: var(--color-tertiary);
+  border: 1px solid var(--color-tertiary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+.btn--forfeit:hover:not(:disabled) {
+  opacity: 0.85;
+}
+</style>

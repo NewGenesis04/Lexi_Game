@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '../stores/game'
 import { usePendingMove } from '../composables/usePendingMove'
-import { useTheme } from '../composables/useTheme'
 import GameBoard from '../components/game/GameBoard.vue'
 import TileRack from '../components/game/TileRack.vue'
 import PlayerPanel from '../components/ui/PlayerPanel.vue'
 import MoveControls from '../components/ui/MoveControls.vue'
-import ThemePicker from '../components/settings/ThemePicker.vue'
+import bagImg from '../assets/bag.svg'
 
 const route = useRoute()
 const router = useRouter()
 const store = useGameStore()
-const { themeName, setTheme, availableThemes } = useTheme()
 const {
   selectedRackIndex,
   ghosts,
@@ -36,7 +34,6 @@ const {
 const code = route.params.code as string
 const myRack = computed(() => store.myPlayer?.rack ?? [])
 const myBoard = computed(() => store.game?.board ?? [])
-const showThemePicker = ref(false)
 
 const placedIndices = computed(() => {
   const s = new Set<number>()
@@ -44,6 +41,11 @@ const placedIndices = computed(() => {
     s.add(g.rackIndex)
   }
   return s
+})
+
+const winner = computed(() => {
+  if (!store.game || store.game.winner === null) return null
+  return store.game.players[store.game.winner]
 })
 
 function handlePlaceTile(row: number, col: number) {
@@ -70,46 +72,54 @@ function handleLeave() {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-neutral-900 text-white">
-    <header class="relative flex items-center justify-between border-b border-neutral-700 px-6 py-3">
-      <span class="text-lg font-bold">Game {{ code }}</span>
+  <div class="flex min-h-screen flex-col" style="background: var(--color-surface); color: var(--color-on-surface);">
+    <header
+      class="flex items-center justify-between px-6 py-3"
+      style="background: var(--color-surface-container-low); border-bottom: 1px solid var(--color-outline-variant);"
+    >
+      <span style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-surface-variant);">
+        GAME · {{ code }}
+      </span>
       <div class="flex items-center gap-2">
         <button
-          class="rounded px-2 py-1 text-xs text-neutral-400 transition hover:text-white"
-          :title="`Theme: ${themeName}`"
-          @click="showThemePicker = !showThemePicker"
-        >
-          Theme
-        </button>
-        <button
-          class="rounded bg-red-700 px-3 py-1 text-sm transition hover:bg-red-800"
+          style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-primary); background: var(--color-tertiary-container); border: none; border-radius: 0.25rem; padding: 6px 12px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s;"
+          @mouseenter="(e: any) => { e.target.style.opacity = '0.85' }"
+          @mouseleave="(e: any) => { e.target.style.opacity = '1' }"
           @click="handleLeave"
         >
           Leave
         </button>
-        <ThemePicker
-          :themes="availableThemes"
-          :current="themeName"
-          :open="showThemePicker"
-          @select="(name) => { setTheme(name); showThemePicker = false }"
-          @close="showThemePicker = false"
-        />
       </div>
     </header>
 
-    <div class="flex flex-1 flex-col items-center gap-6 p-6 lg:flex-row lg:items-start lg:justify-center">
+    <div class="flex flex-1 flex-col items-center gap-6 p-6 lg:flex-row lg:items-start lg:justify-center" style="padding-bottom: 80px;">
       <PlayerPanel
         :player="store.opponent"
         position="top"
       />
 
       <div class="flex flex-col items-center gap-4">
+        <!-- Bag indicator -->
+        <div
+          class="flex items-center gap-1.5 self-end"
+          style="
+            background: rgba(38,38,38,0.4);
+            border-radius: 999px;
+            border: 1px solid rgba(96,96,96,0.3);
+            padding: 4px 12px;
+          "
+        >
+          <img :src="bagImg" style="width: 16px; height: 16px;" alt="bag" />
+          <span style="font-family: var(--font-panel); font-size: 12px; font-weight: 700; color: #d4d4d4;">
+            {{ store.game?.bag_remaining ?? 0 }}
+          </span>
+        </div>
+
         <GameBoard
           :board="myBoard"
           :ghost-at="ghostAt"
           :blank-letter-at="(r, c) => blankLetterMap.get(`${r},${c}`)"
           :has-selection="selectedRackIndex !== null"
-          :theme-name="themeName"
           @place-tile="handlePlaceTile"
           @remove-ghost="tryRemoveGhost"
           @set-blank-letter="setBlankLetter"
@@ -138,6 +148,79 @@ function handleLeave() {
         :player="store.myPlayer"
         position="bottom"
       />
+    </div>
+
+    <!-- Game Over overlay -->
+    <div
+      v-if="store.phase === 'finished'"
+      class="fixed inset-0 z-50 flex items-center justify-center"
+      style="background: rgba(19,19,19,0.9);"
+    >
+      <div
+        class="text-center"
+        style="
+          background: var(--color-surface-container-low);
+          border-radius: 0.5rem;
+          border: 1px solid var(--color-outline);
+          box-shadow: var(--shadow-overlay);
+          padding: 32px;
+          max-width: 360px;
+          width: 100%;
+        "
+      >
+        <h2 style="font-family: var(--font-serif); font-size: 32px; font-weight: 600; color: var(--color-on-surface-variant); letter-spacing: -0.02em; margin-bottom: 24px;">
+          GAME OVER
+        </h2>
+
+        <div v-if="winner" class="space-y-1">
+          <div style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-surface-variant);">Winner</div>
+          <div style="font-family: var(--font-serif); font-size: 28px; font-weight: 500; color: var(--color-primary);">{{ winner.nickname }}</div>
+          <div style="font-family: var(--font-sans); font-size: 36px; font-weight: 600; color: var(--color-on-surface);">{{ winner.score }}</div>
+        </div>
+
+        <div v-if="store.game" class="space-y-2 mt-6">
+          <div style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-surface-variant);">Final Scores</div>
+          <div class="space-y-2">
+            <div
+              v-for="(p, i) in store.game.players"
+              :key="i"
+              class="flex items-center justify-between"
+              :style="{
+                background: 'var(--color-surface-container)',
+                borderRadius: '0.375rem',
+                border: '1px solid var(--color-outline-variant)',
+                padding: '12px 16px',
+              }"
+            >
+              <span style="font-family: var(--font-serif); font-size: 18px; color: var(--color-on-surface);">{{ p.nickname }}</span>
+              <span style="font-family: var(--font-sans); font-size: 24px; font-weight: 600; color: winner?.nickname === p.nickname ? 'var(--color-primary)' : 'var(--color-tertiary)';">{{ p.score }}</span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          class="w-full mt-6"
+          style="
+            background: linear-gradient(180deg, var(--color-outline), #8a7d7b);
+            color: var(--color-surface-container-lowest);
+            border: none;
+            box-shadow: var(--shadow-button-filled);
+            border-radius: 0.25rem;
+            padding: 12px 24px;
+            font-family: var(--font-sans);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s;
+          "
+          @mouseenter="(e: any) => { e.target.style.opacity = '0.85' }"
+          @mouseleave="(e: any) => { e.target.style.opacity = '1' }"
+          @click="router.push('/')"
+        >
+          Play Again
+        </button>
+      </div>
     </div>
   </div>
 </template>

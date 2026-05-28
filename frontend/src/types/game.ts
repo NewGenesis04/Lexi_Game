@@ -99,20 +99,3 @@ export interface ToastMessage {
 }
 
 export type PremiumType = 'normal' | 'dl' | 'tl' | 'dw' | 'tw' | 'center'
-
-export interface SquareTheme {
-  bg: string
-  activeBg: string
-  label: string
-  labelColor: string
-}
-
-export interface BoardTheme {
-  name: string
-  boardBg: string
-  border: string
-  ghostBg: string
-  ghostBorder: string
-  occupiedBg: string
-  squares: Record<PremiumType, SquareTheme>
-}

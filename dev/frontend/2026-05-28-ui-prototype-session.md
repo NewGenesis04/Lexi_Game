@@ -1,137 +1,112 @@
-## 2026-05-28 — UI prototype and design direction pivot from flat minimal to skeuomorphic luxury
+## 2026-05-28 — UI prototype refinements: connection-state semantics, notification-bar positioning, tile-rack shuffle
 
 ### What was built
 
-**Three new files were created:**
+This session corrected three behavioural issues in the existing Artisan Tabletop prototype and added one new interaction:
 
-1. **`frontend/src/views/PrototypeUI.vue`** — a self-contained, single-file prototype that renders three switchable screens (Lobby, Game, Game Over) using mock data. No Pinia store, no API calls, no backend dependency. The view is gated behind a throwaway route and is not connected to any production data flow. The `Screen` type (`lobby | game | finished`) determines which section renders; a fixed-position pill switcher at the top of the viewport cycles between them.
+**1. Player panel connection-state dot semantics (corrected).**
 
-2. **`frontend/src/router/index.ts`** — the prototype route was registered at `routes[2]`:
-   ```ts
-   { path: '/prototype/ui', name: 'prototype-ui', component: () => import('../views/PrototypeUI.vue') }
-   ```
+The player panels at `PrototypeUI.vue:434-468` (opponent) and `PrototypeUI.vue:727-762` (current player) had the connection-indicator dot and card opacity wired to the wrong signal. The opacity was previously gated on `players.opp.turn` (whether it was their turn) instead of `players.opp.connected`. The dot colour was binary: green for turn, gray otherwise.
 
-3. **`docs/UI_DESIGN_BRIEF.md`** — rewritten to replace the original flat-minimal design language (which specified "no gradients, no drop-shadows") with a premium system based on glass morphism, layered shadows, gradient fills, and hover animations. The rewrite preserved the structural layout sections (Lobby, Game Board, Game Over, Notification Bar, Settings) but replaced every visual specification.
+Both panels were corrected to the three-state model specified in the design brief:
+- **Connected + active turn:** dot is solid green (`#10b981`) with a `0 0 6px rgba(16,185,129,0.5)` glow. Card opacity = 1. Top border is `2px solid #10b981` (emerald).
+- **Connected + waiting:** dot is emerald (`#34d399`) with a `pulse 2s ease-in-out infinite` animation (keyframe at `PrototypeUI.vue:886-889`). Card opacity = 1. Top border is standard (`1px solid rgba(96,96,96,0.3)`).
+- **Disconnected:** dot is gray (no glow, no animation). Card drops to `opacity: 0.5`.
 
-**Two design systems were prototyped back-to-back in the same file:**
+The opacity bindings at `PrototypeUI.vue:435` and `PrototypeUI.vue:728` both changed from `player.turn` to `player.connected`.
 
-- **Premium Dark (first iteration):** Tailwind utility classes throughout. Gradients on premium cells (`from-blue-900 to-blue-950` for DL, etc.), glass morphism via `backdrop-blur-xl` on player panels and the notification bar, glossy amber tiles with `shadow-lg`, rainbow gradient on the lobby title, `backdrop-blur-2xl` on the game-over overlay, and a `@keyframes fadeIn` animation for the overlay entrance.
+The `pulse` keyframe was added at `PrototypeUI.vue:886-889`:
+```css
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+```
 
-- **The Artisan Tabletop System (second iteration, current):** A complete replacement of every inline style to match an external design system specification. The colour palette is hardcoded in a reactive `colors` object in `PrototypeUI.vue:13-33` from a Material-like token set (`surface: '#131313'`, `primary-container: '#3e2723'` (Dark Walnut), `outline: '#9c8d8b'` (Brass), `tertiary-container: '#5a1200'` (Copper)). Typefaces are loaded via Google Fonts: EB Garamond for lettering, Work Sans for labels and numbers. CSS box-shadows use tight, high-opacity values (`inset 0 1px 2px rgba(0,0,0,0.3)` for carved recesses, `0 1px 3px rgba(0,0,0,0.4)` for physical tokens). Borders are 1px solid `colors.outline` to simulate brass inlay.
+**2. Notification bar repositioned from flow layout to fixed overlay.**
 
-The board grid in the Artisan iteration uses the `cellStyle()` function at `PrototypeUI.vue:36-51` to map premium types (1=DL, 4=TL, 2=DW, 3=TW, 5=★) to artisan material colours rather than Tailwind gradient strings. Placed tiles render as `surface-container-high` plaques with engraved-looking EB Garamond letters and Work Sans point subscripts at bottom-right.
+The notification bar at `PrototypeUI.vue:766-791` was originally a flex child in the `flex-col` game layout. When it appeared, it pushed the board, rack, and controls upward, causing vertical overflow and requiring scroll to reach the controls.
+
+The bar was changed from inline-flow to `fixed bottom-0 left-0 right-0 z-50` at `PrototypeUI.vue:773`. It now overlays the viewport as a 30px strip without affecting document flow. The `slideUp` animation (`PrototypeUI.vue:881-884`) slides it in from below the viewport edge.
+
+**3. Rack tiles made reactive; shuffle function added.**
+
+The `rackTiles` array at `PrototypeUI.vue:96-104` was a plain `const` array, which meant Vue reactivity could not detect mutations. It was wrapped in `ref()` (import already present at line 2).
+
+The `shuffleRack()` function at `PrototypeUI.vue:109-117` performs a Fisher-Yates shuffle on a copy of `rackTiles.value` and reassigns the ref. It also clears `selectedIndex.value` to `null`.
+
+A shuffle button was added at `PrototypeUI.vue:602-631` as the last element in the rack's flex row. It is a 36×36px transparent button with a `1px solid #504442` border and an inline SVG icon showing crossed arrows (two polyline arrowheads with connecting lines). The icon uses `currentColor` and inherits `colors.outline` (`#9c8d8b`). On click it calls `shuffleRack()`.
+
+**4. Design brief rewritten to match implemented reality.**
+
+The file `docs/UI_DESIGN_BRIEF.md` was entirely rewritten. The previous version described a flat-minimal design with Tailwind gradients, glass morphism via `backdrop-blur`, and a general Tailwind-centred palette. The new version documents every hex value, every font stack, every box-shadow string, and every interaction state as they exist in `PrototypeUI.vue`. It is structured by screen (Lobby, Game, Game Over) and within each screen by component, with tables for typography and palette tokens. It supersedes the earlier rewrite from session 1 because the earlier version was aspirational; this one is descriptive.
 
 ### Decisions taken
 
-**Decision 1: Single-file prototype over component decomposition.**
-The prototype skill (`prototype/UI.md`) recommends creating several structurally distinct variants switchable via `?variant=` search param and a floating bottom bar. This was rejected in favour of a single monolithic `.vue` file containing all three screens inline. Rationale: the user's brief was prescriptive enough that the design direction was already settled — the question was not "which layout?" but "does this texture feel right?" A single file reduces iteration friction: every style change is in one place, no prop-drilling across components, no route-guard wiring. The downside is this file is 653 lines and cannot be decomposed into production components without rewriting.
+**Decision 1: `opacity: 0.5` signals disconnected, not "not your turn".**
 
-**Decision 2: Inline styles over Tailwind utility classes for the Artisan iteration.**
-The Premium Dark iteration used Tailwind classes exclusively (`bg-gradient-to-br`, `shadow-2xl`, `backdrop-blur-xl`). The Artisan iteration switched to Vue `:style` bindings with a shared `colors` object. Rationale: the Artisan palette has no overlap with Tailwind's built-in colour scale (no `amber-50`, no `neutral-900` — only arbitrary hex values like `#131313` and `#3e2723`). Tailwind v4's CSS-first configuration could have been extended via `@theme` in `style.css`, but that would pollute a global config file for a throwaway prototype. Inline styles keep the prototype self-contained.
+The prototype's initial implementation mapped `opacity: 0.5` to `!player.turn`, which meant the waiting player's card was always dimmed. This was a misreading of the spec: the spec uses the turn indicator exclusively via the emerald top-border, not via card opacity. The opacity half-toning is reserved for the disconnected state, signalling to the player that their opponent has dropped off. No alternative was considered — this was a straightforward bug fix.
 
-**Decision 3: Mock data embedded in the prototype rather than pulling from the Pinia store.**
-The production `LobbyView.vue` and `GameView.vue` both read from `useGameStore()`. The prototype defines its own `placedTiles` array, `rackTiles` array, and `PREMIUM` grid layout. Rationale: zero backend dependency. The prototype runs with `pnpm dev`, no FastAPI, no Redis, no SSE. The tile placement data mirrors the production `GameState.board` shape but is purely decorative.
+**Decision 2: Notification bar stays `fixed` (overlay) rather than inline.**
 
-**Decision 4: Embed Google Fonts via `@import` in the component `<style>` block.**
-The Artisan spec requires EB Garamond and Work Sans. The import is at `PrototypeUI.vue:647`. Alternative considered: downloading and self-hosting, or adding a `<link>` to `index.html`. Rejected because (a) the prototype is throwaway and (b) the production design brief (still in `docs/UI_DESIGN_BRIEF.md`) specifies the system font stack — these fonts will never ship to production.
+The previous session had moved the notification bar from `fixed bottom-0` to inline flow to avoid covering the controls. But inline flow caused the entire game layout to shift on notification appearance, creating a scroll requirement. The bar was returned to `fixed bottom-0 left-0 right-0 z-50` at 30px height. At 30px it is slim enough to overlay only the bottom edge of the game area — it does not cover any controls because the controls sit above that line in the flex column. The trade-off (content hidden behind the bar when present) is acceptable because the bar auto-dismisses after 3.5 seconds and is click-to-dismiss.
 
-**Decision 5: Backend `main.py` was not modified (reverted).**
-An earlier attempt added `CORSMiddleware` to `packages/backend-api/src/backend_api/main.py` to fix a `TypeError: NetworkError` during room creation. This was reverted when the user clarified the prototype is frontend-only and should not require a running backend. The network error originated from the production `LobbyView` calling `store.createGame()` → `fetch('http://localhost:8000/games')` with no backend running — expected behaviour, not a bug.
+**Decision 3: `rackTiles` wrapped in `ref()` for reactive shuffle.**
+
+The `rackTiles` array was initially declared as `const rackTiles = [...]` — a plain JavaScript array. The shuffle button required mutating this array, but Vue 3 only tracks changes to `ref()` or `reactive()` objects. Wrapping in `ref()` was the minimal change. Alternative considered: using `reactive()`, but the array is the only reactive data it holds, and `ref` is semantically clearer for a single value. `shuffleRack()` replaces the entire array (`rackTiles.value = arr`) after shuffling a copy, rather than mutating in-place, so Vue's change detection fires correctly.
+
+**Decision 4: Design brief converted from spec to documentation.**
+
+The earlier design brief was a forward spec — it described what should be built. This session rewrote it to describe what exists. The structure stays the same (screens and components as sections) but every value is taken directly from the `colors` object and inline styles in `PrototypeUI.vue`. This was not a debated decision; the user explicitly requested the brief be updated to "the current design language of the prototype" so they could use it as a starting point for production.
 
 ### Problems identified
 
-**Problem 1: Backend route handlers are stubs.**
-In `packages/backend-api/src/backend_api/routes/games.py`, all five endpoints (`create_game`, `join_game`, `submit_move`, `forfeit_game`, `get_game`) are empty function bodies containing only `...`. The SSE endpoint in `routes/events.py` is similarly a stub. Calling any of these over HTTP returns a 500 Internal Server Error with no body. This is open — the routes were presumably deferred for later implementation. The frontend's `LobbyView.handleCreate()` (at `LobbyView.vue:16`) will fail with a network error when it tries to `POST /games` against a running backend because the handler has no return statement.
+**Problem 1: No `opacity` transition on player panels for disconnect state.**
 
-**Problem 2: No CORS middleware on the backend.**
-The FastAPI app in `main.py` (8 lines) does not configure `CORSMiddleware`. When the frontend dev server runs on `localhost:5173` and the backend on `localhost:8000`, the browser's same-origin policy blocks all cross-origin requests. This is open — it was never configured because the backend routes are not yet functional.
+When `players.opp.connected` toggles to `false`, the `opacity` jumps from 1 to 0.5 instantly because there is no CSS transition on the wrapper div at `PrototypeUI.vue:435`. The same applies to the current player panel at line 728. This is currently untestable because the mock data always has both players connected. Trivial to fix by adding `transition: 'opacity 0.3s'` to the wrapper style object. *Resolved?* No change made — purely cosmetic and blocked on having a disconnect trigger to drive it.
 
-**Problem 3: Prototype tile rack selection is decorative only.**
-The `selectedIndex` ref at `PrototypeUI.vue:105` toggles visual state (ring, lift, colour swap) but does not feed into any board-placement logic. There is no composable equivalent to `usePendingMove.ts` wired in. This is by design for a visual prototype but means the interaction model cannot be validated from this file.
+**Problem 2: `players` object is not reactive.**
 
-**Problem 4: The board theme system (`constants/board.ts`) is not used by the prototype.**
-The prototype duplicates the premium layout grid (the 15×15 integer matrix at `PrototypeUI.vue:57-73`) and defines its own cell styling in `cellStyle()` rather than consuming `PREMIUM_LAYOUT` and `BOARD_THEMES` from `frontend/src/constants/board.ts`. This is open as a code-quality concern but acceptable for a throwaway prototype.
+The mock player data at `PrototypeUI.vue:121-124` is a plain object literal assigned to `const players`. Changing `players.opp.connected` or `players.opp.turn` will never trigger a re-render. This matters because the dot colour, animation, card opacity, and top-border colour all depend on these fields. In a true prototype with toggles or simulated state changes, this would need to be `reactive()` or individual `ref()`s. Currently it does not manifest because the data never changes. *Open.*
 
-**Problem 5: Font loading adds a render-blocking request.**
-The Google Fonts `@import` in the component style block will block rendering until the stylesheet is fetched. In production this would be visible as a flash of invisible text (FOIT). Acceptable for prototype.
+**Problem 3: Notification cycling timer does not handle tab visibility.**
+
+The `notifTimer` interval at `PrototypeUI.vue:187-197` runs unconditionally every 3.5 seconds. If the browser tab is backgrounded, browsers throttle `setInterval` to 1 tick per minute. On return, the queue of backlogged ticks fires rapidly, flashing through all notifications. The fix would use `requestAnimationFrame`-based scheduling or check `document.visibilityState`. *Open.*
+
+**Problem 4: Board labels use fixed column letter array, not the shared constant.**
+
+The `COL_LABELS` constant at `PrototypeUI.vue:5` duplicates the column letters. The production codebase has this in `constants/board.ts` (the `COLUMNS` or equivalent export). Not a functional concern for the prototype but means layout changes would need to be kept in sync by hand. *Open.*
+
+**Problem 5: Google Fonts `@import` remains render-blocking.**
+
+Identified in the previous session; unchanged. The `@import` at `PrototypeUI.vue:874` blocks rendering until the stylesheet is fetched from Google's CDN. Acceptable for throwaway prototype.
 
 ### Current state of the codebase
 
-**Backend (FastAPI) — fully stubbed.**
+**Prototype (`frontend/src/views/PrototypeUI.vue`) — 890 lines.**
 
-- `backend-api/src/backend_api/main.py` — FastAPI app instantiated, two routers included. No middleware. 8 lines.
-- `backend-api/src/backend_api/routes/games.py` — five endpoints, all `async def ...: ...`. 30 lines.
-- `backend-api/src/backend_api/routes/events.py` — one endpoint (`GET /events`), stubbed. 11 lines.
-- `backend-api/src/backend_api/services/game_service.py` — file exists, not read during this session.
-- `backend-api/src/backend_api/repositories/game_repo.py` — file exists, not read.
-- `backend-api/src/backend_api/game_manager.py` — file exists.
-- `backend-api/src/backend_api/sse_manager.py` — file exists.
-- `backend-api/src/backend_api/session.py` — file exists.
+All three screens are fully rendered with mock data and the Artisan Tabletop styling. The connection-state dot logic is correct. The shuffle button works. The notification bar overlays without pushing content. The design brief accurately reflects all values.
 
-**Game engine — not examined during this session.**
+Not yet implemented in the prototype:
+- Tile placement interaction (selection is purely visual)
+- Ghost tiles / pending placement highlighting on the board
+- Blank-tile letter picker
+- Swap-mode visual toggle (yellow tile tint)
+- Submit/Clear/Pass/Forfeit button wiring (all are decorative)
+- Theme picker dropdown
+- Lobby form submission wiring
 
-- `game-engine/src/game_engine/board.py`, `scoring.py`, `bag.py`, `dictionary.py`, `models.py` — presumed fully or partially implemented, not read.
+**Design brief (`docs/UI_DESIGN_BRIEF.md`) — rewritten, 340 lines.**
 
-**Frontend (Vue SPA) — two production views, one throwaway route.**
+Now contains exact hex values, font stacks (EB Garamond, Work Sans, system-ui, SF Mono/JetBrains Mono), box-shadow strings, interaction states, and layout rules matching the prototype. Should be used as the implementation spec for production components.
 
-- `frontend/src/views/LobbyView.vue` — fully implemented with wired Pinia calls. Two-tab form (Create / Join). Calls `store.createGame()` and `store.joinGame()`. Cannot function without a running backend.
-- `frontend/src/views/GameView.vue` — fully implemented composition root. Imports `GameBoard`, `TileRack`, `PlayerPanel`, `MoveControls`, `ThemePicker`. Consumes `useGameStore()` and `usePendingMove()`. Cannot function without a running backend.
-- `frontend/src/views/PrototypeUI.vue` — throwaway prototype, 653 lines. Self-contained mock data, no store dependency. Three-screen switcher with Artisan Tabletop styling.
+**Backend and remaining frontend — unchanged from session 1.**
 
-**Frontend components — all production, all flat-styled.**
-
-- `components/game/GameBoard.vue` — 15×15 table grid, theme-driven via `constants/board.ts`. Renders ghost tiles, handles blank-letter picker overlay. No premium styling.
-- `components/game/TileRack.vue` — 7-slot horizontal strip, amber-100 tiles, ring on selection. 42 lines.
-- `components/ui/PlayerPanel.vue` — score, clock, connection dot, "Current turn" label. neutral-800 surface, no glass morphism. 42 lines.
-- `components/ui/MoveControls.vue` — Submit/Clear/Swap/Pass/Forfeit buttons. Solid neutral-600 and blue-600 backgrounds. 97 lines.
-- `components/ui/ToastFooter.vue` — fixed-bottom toast list. Solid red/green/neutral backgrounds. 27 lines.
-- `components/settings/ThemePicker.vue` — exists but not read during this session.
-
-**Frontend infrastructure — all implemented.**
-
-- `router/index.ts` — three routes (`/`, `/game/:code`, `/prototype/ui`).
-- `router/guards.ts` — `gameGuard` (read during prior session, not shown here).
-- `stores/game.ts` — Pinia store with `game`, `session`, `toasts`, `connected` state. `createGame`, `joinGame`, `submitMove`, `forfeit`, `fetchGame` actions. SSE lifecycle methods. 144 lines.
-- `services/api.ts` — `fetch()`-based HTTP client, `ApiRequestError` class, five typed methods. 69 lines.
-- `composables/sse.ts` — EventSource lifecycle manager (read during prior session, not shown here).
-- `composables/usePendingMove.ts` — click-then-click tile placement state machine. Ghost tiles, swap mode, blank letters. 165 lines.
-- `composables/useTheme.ts` — theme persistence via localStorage, three themes from `constants/board.ts`. 31 lines.
-- `types/game.ts` — 21 interfaces/types including `GameState`, `PlayerState`, `BoardTheme`, `MovePayload`. 118 lines.
-- `constants/board.ts` — `buildGrid()` generates the 15×15 premium layout; `BOARD_THEMES` array with Classic, Dark, High Contrast; `getTheme()` lookup. 78 lines.
-- `App.vue` — `<router-view>` + `ToastFooter`. 8 lines.
-- `main.ts` — `createApp`, Pinia, Router mount. 10 lines.
-
-**Documentation:**
-
-- `docs/ARCHITECTURE.md` — 284 lines, 31 engineering decisions (Q1–Q31). Covers tile set, word lists, SSE design, Redis data model, disconnect state machine, deployment.
-- `docs/FRONTEND.md` — 234 lines, 13 frontend decisions (FQ1–FQ13). Covers framework choice, CSS strategy, Pinia store, component architecture, SSE lifecycle.
-- `docs/UI_DESIGN_BRIEF.md` — rewritten this session, 255 lines. Premium design system documentation with gradients, glass morphism, shadows, animation specs, per-component styling.
-- `docs/RULES.md` — exists but not read during this session.
+The route stubs, missing CORS middleware, and decorative prototype interactions documented in the previous session remain open. No new production code was written this session.
 
 ### References
 
 | File | Key locations |
 |------|---------------|
-| `frontend/src/views/PrototypeUI.vue` | `colors` object (L13–33), `cellStyle()` (L36–51), `PREMIUM` grid (L57–73), `placedTiles` (L82–93), `rackTiles` (L95–103), `selectedIndex` (L105), screen switcher (L124–152), board table (L361–414), tile rack (L417–456), controls (L458–547), game-over overlay (L566–640), Google Fonts `@import` (L647) |
-| `frontend/src/router/index.ts` | `routes[2]` prototype registration (L18–22) |
-| `docs/UI_DESIGN_BRIEF.md` | Premium Design System section (L36–71), Board (L145–158), Controls (L172–187), Design Principles (L247–255) |
-| `packages/backend-api/src/backend_api/main.py` | FastAPI app (L1–8), no CORS middleware |
-| `packages/backend-api/src/backend_api/routes/games.py` | Five stubbed endpoints (L8–30) |
-| `packages/backend-api/src/backend_api/routes/events.py` | Stubbed SSE endpoint (L10–11) |
-| `frontend/src/views/LobbyView.vue` | `handleCreate()` (L16–27), `handleJoin()` (L29–40) |
-| `frontend/src/views/GameView.vue` | Composition root (L1–69), template layout (L72–143) |
-| `frontend/src/stores/game.ts` | `useGameStore` (L19–144), `createGame()` (L63–72), `joinGame()` (L74–79) |
-| `frontend/src/services/api.ts` | `request()` (L12–25), `createGame()` (L37–43), base URL default (L10) |
-| `frontend/src/composables/usePendingMove.ts` | `GhostTile` interface (L4–8), `buildPlacePayload()` (L20–34), `selectRackTile()` (L50–60), `tryPlaceTile()` (L62–76) |
-| `frontend/src/composables/useTheme.ts` | `themeName` ref (L16), `setTheme()` (L26–28), `availableThemes` (L30) |
-| `frontend/src/types/game.ts` | `GameState` (L46–61), `PlayerState` (L26–34), `BoardTheme` (L110–118), `PremiumType` (L101) |
-| `frontend/src/constants/board.ts` | `buildGrid()` (L5–21), `BOARD_THEMES` (L25–74), `getTheme()` (L76–78) |
-| `frontend/src/components/game/GameBoard.vue` | `cellClasses()` (L41–54), `cellContent()` (L56–68), `handleCellClick()` (L25–39) |
-| `frontend/src/components/game/TileRack.vue` | `tileClasses()` (L16–22) |
-| `frontend/src/components/ui/PlayerPanel.vue` | Template (L10–41) |
-| `frontend/src/components/ui/MoveControls.vue` | `handleSubmit()` (L22–32), `handlePass()` (L34–43), `handleForfeit()` (L45–54) |
-| `frontend/src/components/ui/ToastFooter.vue` | Toast rendering (L7–27) |
-| `frontend/src/App.vue` | `<router-view>` + `ToastFooter` (L5–8) |
-| `frontend/src/main.ts` | App bootstrap (L1–10) |
-| `docs/FRONTEND.md` | FQ1–FQ13 decisions (L125–224), directory structure (L84–119) |
-| `docs/ARCHITECTURE.md` | Q1–Q31 decisions (L107–284), data flow diagrams (L8–62) |
+| `frontend/src/views/PrototypeUI.vue` | `colors` object (L14–34), `rackTiles` ref (L96–104), `shuffleRack()` (L109–117), `players` mock data (L121–124), opponent panel (L434–468), shuffle button (L602–631), current-player panel (L727–762), notification bar (L766–791), `pulse` keyframe (L886–889) |
+| `docs/UI_DESIGN_BRIEF.md` | Full rewrite — palette (Visual Identity section), typography table, player panel spec (Screen 2 > Player Panel), notification bar spec (Screen 2 > Notification Bar), Design Principles (principles 6 and 8 added) |

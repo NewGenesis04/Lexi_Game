@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import type { Tile } from '../../types/game'
-import { PREMIUM_LAYOUT, getTheme } from '../../constants/board'
+import { PREMIUM_LAYOUT, PREMIUM_LABELS } from '../../constants/board'
 
 const props = defineProps<{
   board: (Tile | null)[][]
   ghostAt: (row: number, col: number) => { rackIndex: number; row: number; col: number } | undefined
   blankLetterAt: (row: number, col: number) => string | undefined
   hasSelection: boolean
-  themeName?: string
 }>()
 
 const emit = defineEmits<{
@@ -17,10 +16,10 @@ const emit = defineEmits<{
   setBlankLetter: [row: number, col: number, letter: string]
 }>()
 
-const theme = computed(() => getTheme(props.themeName ?? 'Dark'))
-const pickerPos = ref<{ row: number; col: number } | null>(null)
-
 const COL_LABELS = 'ABCDEFGHIJKLMNO'.split('')
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
+const pickerPos = ref<{ row: number; col: number } | null>(null)
 
 function handleCellClick(row: number, col: number) {
   const ghost = props.ghostAt(row, col)
@@ -38,65 +37,29 @@ function handleCellClick(row: number, col: number) {
   }
 }
 
-function cellClasses(row: number, col: number) {
-  const premium = PREMIUM_LAYOUT[row][col]
-  const sq = theme.value.squares[premium]
-  const isGhost = props.ghostAt(row, col)
-
-  if (isGhost) {
-    return `${theme.value.ghostBg} ${theme.value.ghostBorder} border text-white text-xs font-bold flex items-center justify-center`
-  }
-  if (props.board[row]?.[col]) {
-    return `${theme.value.occupiedBg} ${theme.value.border} border text-neutral-900 text-xs font-bold flex items-center justify-center hover:brightness-110`
-  }
-  const hover = props.hasSelection ? 'hover:brightness-125 cursor-pointer' : ''
-  return `${sq.bg} ${theme.value.border} border ${hover} flex items-center justify-center`
-}
-
-function cellContent(row: number, col: number) {
-  const ghost = props.ghostAt(row, col)
-  if (ghost) {
-    const blankLetter = props.blankLetterAt(row, col)
-    return blankLetter ?? '?'
-  }
-  const placed = props.board[row]?.[col]
-  if (placed) return placed.letter
-
-  const premium = PREMIUM_LAYOUT[row][col]
-  const sq = theme.value.squares[premium]
-  return sq.label
-}
-
-function cellLabelClasses(row: number, col: number) {
-  if (props.board[row]?.[col] || props.ghostAt(row, col)) return 'text-xs font-bold'
-  const premium = PREMIUM_LAYOUT[row][col]
-  return `text-[10px] font-semibold ${theme.value.squares[premium].labelColor}`
-}
-
-const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-
 function pickLetter(letter: string) {
   if (!pickerPos.value) return
   emit('setBlankLetter', pickerPos.value.row, pickerPos.value.col, letter)
   pickerPos.value = null
 }
+
+function premium(row: number, col: number) {
+  return PREMIUM_LAYOUT[row][col]
+}
 </script>
 
 <template>
   <div class="relative">
-    <div
-      class="inline-block rounded-lg border-2 p-1 shadow-lg"
-      :class="[theme.boardBg, theme.border]"
-    >
-      <table class="border-collapse">
+    <!-- Board container -->
+    <div class="board-container">
+      <table class="board-table">
         <thead>
           <tr>
             <th class="h-5 w-6" />
             <th
               v-for="(label, ci) in COL_LABELS"
               :key="ci"
-              class="h-5 w-9 text-[10px] font-semibold"
-              :class="theme.squares.normal.labelColor"
+              class="h-5 w-9 text-center label"
             >
               {{ label }}
             </th>
@@ -104,27 +67,39 @@ function pickLetter(letter: string) {
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="(row, ri) in board"
-            :key="ri"
-          >
-            <td class="w-6 text-center text-[10px] font-semibold" :class="theme.squares.normal.labelColor">
-              {{ ri + 1 }}
-            </td>
+          <tr v-for="(row, ri) in board" :key="ri">
+            <td class="w-6 text-center label">{{ ri + 1 }}</td>
             <td
               v-for="(_, ci) in row"
               :key="ci"
-              class="h-9 w-9"
-              :class="cellClasses(ri, ci)"
-              @click="handleCellClick(ri, ci)"
+              class="p-[1px]"
             >
-              <span :class="cellLabelClasses(ri, ci)">
-                {{ cellContent(ri, ci) }}
-              </span>
+              <div
+                class="cell"
+                :class="{
+                  'cell--occupied': board[ri]?.[ci],
+                  'cell--ghost': ghostAt(ri, ci),
+                  'cell--hoverable': hasSelection && !board[ri]?.[ci] && !ghostAt(ri, ci),
+                  [`cell--${premium(ri, ci)}`]: !board[ri]?.[ci] && !ghostAt(ri, ci) && premium(ri, ci) !== 'normal',
+                }"
+                @click="handleCellClick(ri, ci)"
+              >
+                <!-- Placed tile -->
+                <template v-if="board[ri]?.[ci]">
+                  <span class="tile-letter">{{ board[ri][ci]!.letter }}</span>
+                  <span class="tile-points">{{ board[ri][ci]!.plays_as === '' ? '' : (board[ri][ci]!.plays_as ?? '') }}</span>
+                </template>
+                <!-- Ghost tile -->
+                <template v-else-if="ghostAt(ri, ci)">
+                  <span class="ghost-letter">{{ blankLetterAt(ri, ci) ?? '?' }}</span>
+                </template>
+                <!-- Premium label -->
+                <span v-else-if="premium(ri, ci) !== 'normal'" class="premium-label">
+                  {{ PREMIUM_LABELS[premium(ri, ci)] }}
+                </span>
+              </div>
             </td>
-            <td class="w-6 text-center text-[10px] font-semibold" :class="theme.squares.normal.labelColor">
-              {{ ri + 1 }}
-            </td>
+            <td class="w-6 text-center label">{{ ri + 1 }}</td>
           </tr>
         </tbody>
         <tfoot>
@@ -133,8 +108,7 @@ function pickLetter(letter: string) {
             <th
               v-for="(label, ci) in COL_LABELS"
               :key="ci"
-              class="h-5 w-9 text-[10px] font-semibold"
-              :class="theme.squares.normal.labelColor"
+              class="h-5 w-9 text-center label"
             >
               {{ label }}
             </th>
@@ -144,32 +118,33 @@ function pickLetter(letter: string) {
       </table>
     </div>
 
+    <!-- Empty state -->
     <div
       v-if="!board.length"
-      class="absolute inset-0 flex items-center justify-center text-neutral-500"
+      class="absolute inset-0 flex items-center justify-center"
+      style="color: var(--color-on-surface-variant); font-family: var(--font-sans); font-size: 12px;"
     >
       Loading board…
     </div>
 
+    <!-- Blank-letter picker -->
     <div
       v-if="pickerPos"
-      class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-neutral-500 bg-neutral-900 p-3 shadow-xl"
+      class="blank-picker"
     >
-      <div class="mb-2 text-center text-xs text-neutral-400">
-        Choose letter for blank
-      </div>
-      <div class="grid grid-cols-7 gap-1">
+      <div class="blank-picker__title">Choose letter for blank</div>
+      <div class="blank-picker__grid">
         <button
           v-for="letter in LETTERS"
           :key="letter"
-          class="flex h-7 w-7 items-center justify-center rounded bg-neutral-700 text-xs font-bold text-white hover:bg-blue-600"
+          class="blank-picker__btn"
           @click="pickLetter(letter)"
         >
           {{ letter }}
         </button>
       </div>
       <button
-        class="mt-2 w-full rounded bg-neutral-700 px-2 py-1 text-xs text-neutral-400 hover:text-white"
+        class="blank-picker__cancel"
         @click="pickerPos = null"
       >
         Cancel
@@ -177,3 +152,178 @@ function pickLetter(letter: string) {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* ── Board container ───────────────────────── */
+.board-container {
+  display: inline-block;
+  border-radius: var(--radius-board);
+  border: 2px solid var(--color-outline);
+  padding: 8px;
+  background: linear-gradient(180deg, var(--color-surface-dim), var(--color-surface-container-low));
+  box-shadow: var(--shadow-board);
+}
+
+.board-table {
+  border-collapse: separate;
+  border-spacing: 1px;
+}
+
+/* ── Labels (row/col headers) ────────────── */
+.label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--color-on-surface-variant);
+}
+
+/* ── Cells ─────────────────────────────────── */
+.cell {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-cell);
+  box-shadow: var(--shadow-cell-inset);
+  transition: all 0.15s;
+  position: relative;
+  cursor: default;
+}
+
+.cell--hoverable {
+  cursor: pointer;
+}
+.cell--hoverable:hover {
+  box-shadow: var(--shadow-cell-inset), 0 0 0 1px var(--color-outline);
+}
+
+/* ── Placed-tile cell ──────────────────────── */
+.cell--occupied {
+  background: var(--color-placed-tile-bg);
+  border: 1px solid var(--color-outline);
+  box-shadow: var(--shadow-cell-occupied);
+}
+
+.tile-letter {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-placed-tile-letter);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.tile-points {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--color-placed-tile-points);
+  line-height: 1;
+}
+
+/* ── Ghost tile ────────────────────────────── */
+.cell--ghost {
+  background: rgba(212, 197, 169, 0.35);
+  border: 2px solid var(--color-active-turn);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+
+.ghost-letter {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-active-turn);
+}
+
+/* ── Premium squares ───────────────────────── */
+.cell--dl  { background: var(--color-premium-dl-bg);  border: 1px solid var(--color-outline-variant); }
+.cell--tl  { background: var(--color-premium-tl-bg);  border: 1px solid var(--color-outline-variant); }
+.cell--dw  { background: var(--color-premium-dw-bg);  border: 1px solid var(--color-outline-variant); }
+.cell--tw  { background: var(--color-premium-tw-bg);  border: 1px solid var(--color-outline-variant); }
+.cell--center { background: var(--color-premium-center-bg); border: 1px solid var(--color-outline-variant); }
+
+.premium-label {
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.cell--dl  .premium-label { color: var(--color-premium-dl-label); }
+.cell--tl  .premium-label { color: var(--color-premium-tl-label); }
+.cell--dw  .premium-label { color: var(--color-premium-dw-label); }
+.cell--tw  .premium-label { color: var(--color-premium-tw-label); }
+.cell--center .premium-label { color: var(--color-premium-center-label); }
+
+/* ── Blank-letter picker ───────────────────── */
+.blank-picker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 10;
+  transform: translate(-50%, -50%);
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-low);
+  box-shadow: var(--shadow-overlay);
+  padding: 12px;
+}
+
+.blank-picker__title {
+  margin-bottom: 8px;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-on-surface-variant);
+}
+
+.blank-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.blank-picker__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 0.25rem;
+  background: var(--color-surface-container-high);
+  color: var(--color-on-surface);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.blank-picker__btn:hover {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.blank-picker__cancel {
+  margin-top: 8px;
+  width: 100%;
+  border-radius: 0.25rem;
+  background: var(--color-surface-container-high);
+  color: var(--color-on-surface-variant);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  padding: 4px 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.blank-picker__cancel:hover {
+  color: var(--color-on-surface);
+}
+</style>

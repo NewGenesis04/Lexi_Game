@@ -1,4 +1,4 @@
-import type { PremiumType, BoardTheme } from '../types/game'
+import type { PremiumType } from '../types/game'
 
 type PremiumGrid = PremiumType[][]
 
@@ -22,57 +22,18 @@ function buildGrid(): PremiumGrid {
 
 export const PREMIUM_LAYOUT = buildGrid()
 
-export const BOARD_THEMES: BoardTheme[] = [
-  {
-    name: 'Classic',
-    boardBg: 'bg-amber-50',
-    border: 'border-amber-300',
-    ghostBg: 'bg-green-200',
-    ghostBorder: 'border-green-500',
-    occupiedBg: 'bg-amber-100',
-    squares: {
-      normal:  { bg: 'bg-amber-50',        activeBg: 'bg-amber-200', label: '',         labelColor: 'text-transparent' },
-      dl:      { bg: 'bg-blue-200',        activeBg: 'bg-blue-300',  label: 'DL',       labelColor: 'text-blue-800' },
-      tl:      { bg: 'bg-blue-600',        activeBg: 'bg-blue-700',  label: 'TL',       labelColor: 'text-blue-100' },
-      dw:      { bg: 'bg-pink-300',        activeBg: 'bg-pink-400',  label: 'DW',       labelColor: 'text-pink-800' },
-      tw:      { bg: 'bg-red-500',         activeBg: 'bg-red-600',   label: 'TW',       labelColor: 'text-red-100' },
-      center:  { bg: 'bg-pink-300',        activeBg: 'bg-pink-400',  label: '★',        labelColor: 'text-pink-800' },
-    },
-  },
-  {
-    name: 'Dark',
-    boardBg: 'bg-neutral-800',
-    border: 'border-neutral-600',
-    ghostBg: 'bg-green-700',
-    ghostBorder: 'border-green-400',
-    occupiedBg: 'bg-neutral-700',
-    squares: {
-      normal:  { bg: 'bg-neutral-800',     activeBg: 'bg-neutral-700', label: '',         labelColor: 'text-transparent' },
-      dl:      { bg: 'bg-blue-900',        activeBg: 'bg-blue-800',   label: 'DL',       labelColor: 'text-blue-300' },
-      tl:      { bg: 'bg-blue-950',        activeBg: 'bg-blue-900',   label: 'TL',       labelColor: 'text-blue-400' },
-      dw:      { bg: 'bg-rose-900',        activeBg: 'bg-rose-800',   label: 'DW',       labelColor: 'text-rose-300' },
-      tw:      { bg: 'bg-red-950',         activeBg: 'bg-red-900',    label: 'TW',       labelColor: 'text-red-400' },
-      center:  { bg: 'bg-rose-900',        activeBg: 'bg-rose-800',   label: '★',        labelColor: 'text-rose-300' },
-    },
-  },
-  {
-    name: 'High Contrast',
-    boardBg: 'bg-white',
-    border: 'border-gray-800',
-    ghostBg: 'bg-green-300',
-    ghostBorder: 'border-green-700',
-    occupiedBg: 'bg-gray-100',
-    squares: {
-      normal:  { bg: 'bg-white',           activeBg: 'bg-gray-200',   label: '',         labelColor: 'text-transparent' },
-      dl:      { bg: 'bg-sky-200',         activeBg: 'bg-sky-300',    label: 'DL',       labelColor: 'text-sky-900' },
-      tl:      { bg: 'bg-sky-600',         activeBg: 'bg-sky-700',    label: 'TL',       labelColor: 'text-white' },
-      dw:      { bg: 'bg-pink-200',        activeBg: 'bg-pink-300',   label: 'DW',       labelColor: 'text-pink-900' },
-      tw:      { bg: 'bg-red-600',         activeBg: 'bg-red-700',    label: 'TW',       labelColor: 'text-white' },
-      center:  { bg: 'bg-pink-200',        activeBg: 'bg-pink-300',   label: '★',        labelColor: 'text-pink-900' },
-    },
-  },
-]
+/* ── Premium square display labels ────────────
+   Multi-theme selection is frozen. These labels
+   are the permanent Artisan Tabletop defaults.
+   Visual styling (colours, shadows) lives in
+   CSS custom properties via @theme in style.css.
+   ─────────────────────────────────────────── */
 
-export function getTheme(name: string): BoardTheme {
-  return BOARD_THEMES.find((t) => t.name === name) ?? BOARD_THEMES[0]
+export const PREMIUM_LABELS: Record<PremiumType, string> = {
+  normal: '',
+  dl: 'DL',
+  tl: 'TL',
+  dw: 'DW',
+  tw: 'TW',
+  center: '★',
 }

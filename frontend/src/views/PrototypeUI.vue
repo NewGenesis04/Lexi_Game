@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import bagImg from '../assets/bag.svg'
 
 const COL_LABELS = 'ABCDEFGHIJKLMNO'.split('')
 
@@ -35,18 +36,18 @@ const colors = {
 // Premium square styling per type: { bg, label, labelColor }
 function cellStyle(type: number) {
   switch (type) {
-    case 1: // DL
-      return { background: colors.surfaceContainer, color: colors.secondary }
-    case 4: // TL
-      return { background: colors['surface-container-high'], color: colors['on-surface-variant'] }
-    case 2: // DW
-      return { background: colors['primary-container'], color: colors['primary-fixed-dim'] }
-    case 3: // TW
-      return { background: colors['tertiary-container'], color: colors.tertiary }
+    case 1: // DL — light blue
+      return { background: 'var(--color-premium-dl-bg)', color: 'var(--color-premium-dl-label)' }
+    case 4: // TL — dark blue
+      return { background: 'var(--color-premium-tl-bg)', color: 'var(--color-premium-tl-label)' }
+    case 2: // DW — dark walnut
+      return { background: 'var(--color-premium-dw-bg)', color: 'var(--color-premium-dw-label)' }
+    case 3: // TW — dark red
+      return { background: 'var(--color-premium-tw-bg)', color: 'var(--color-premium-tw-label)' }
     case 5: // center ★
-      return { background: colors['primary-container'], color: colors.primary }
+      return { background: 'var(--color-premium-center-bg)', color: 'var(--color-premium-center-label)' }
     default:
-      return { background: colors.surface, color: 'transparent' }
+      return { background: 'var(--color-surface)', color: 'transparent' }
   }
 }
 
@@ -92,7 +93,7 @@ const placedTiles: PlacedTile[] = [
   { letter: 'E', points: 1, row: 9, col: 7 },
 ]
 
-const rackTiles = [
+const rackTiles = ref([
   { letter: 'A', points: 1 },
   { letter: 'B', points: 3 },
   { letter: 'E', points: 1 },
@@ -100,10 +101,52 @@ const rackTiles = [
   { letter: 'L', points: 1 },
   { letter: 'O', points: 1 },
   { letter: 'Z', points: 10 },
-]
+])
 
 const selectedIndex = ref<number | null>(null)
 const hoveredIndex = ref<number | null>(null)
+
+function shuffleRack() {
+  const arr = [...rackTiles.value]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  rackTiles.value = arr
+  selectedIndex.value = null
+}
+
+// ─── Player data & clock ─────────────────────────────────────────────
+
+const players = {
+  opp: { name: 'Jax', score: 112, connected: true, turn: false },
+  me: { name: 'Neo', score: 137, connected: true, turn: true },
+}
+
+const oppTime = ref(332)
+const myTime = ref(278)
+let clockTimer: ReturnType<typeof setInterval> | null = null
+
+function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+onMounted(() => {
+  clockTimer = setInterval(() => {
+    if (oppTime.value > 0) oppTime.value--
+    if (myTime.value > 0) myTime.value--
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
+})
+
+// ─── Bag ──────────────────────────────────────────────────────────────
+
+const bagRemaining = ref(72)
 
 function tileAt(row: number, col: number) {
   return placedTiles.find(t => t.row === row && t.col === col)
@@ -116,13 +159,53 @@ function premiumType(row: number, col: number) {
 function isPlaced(row: number, col: number) {
   return !!tileAt(row, col)
 }
+
+// ─── Notification cycling ────────────────────────────────────────────
+
+type NotifKind = 'self-move' | 'opponent-move' | 'connected'
+
+const notifs: { kind: NotifKind; dotColor: string }[] = [
+  { kind: 'self-move', dotColor: colors.primary },
+  { kind: 'opponent-move', dotColor: colors.secondary },
+  { kind: 'connected', dotColor: '#4caf50' },
+]
+
+const notifIndex = ref(-1)
+const notifVisible = ref(false)
+let notifTimer: ReturnType<typeof setInterval> | null = null
+
+function showNextNotif() {
+  const next = (notifIndex.value + 1) % notifs.length
+  notifIndex.value = next
+  notifVisible.value = true
+}
+
+function dismissNotif() {
+  notifVisible.value = false
+}
+
+onMounted(() => {
+  notifTimer = setInterval(() => {
+    if (notifVisible.value) {
+      dismissNotif()
+      setTimeout(() => showNextNotif(), 800)
+    } else {
+      showNextNotif()
+    }
+  }, 3500)
+  setTimeout(() => showNextNotif(), 500)
+})
+
+onUnmounted(() => {
+  if (notifTimer) clearInterval(notifTimer)
+})
 </script>
 
 <template>
-  <div class="min-h-screen" :style="{ background: colors.surface, color: colors.onSurface, fontFamily: 'EB Garamond, serif' }">
+  <div class="min-h-screen" :style="{ background: colors.surface, color: colors.onSurface, fontFamily: 'var(--font-serif)' }">
 
     <!-- View Switcher -->
-    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex gap-2" :style="{ fontFamily: 'Work Sans, sans-serif' }">
+    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex gap-2" :style="{ fontFamily: 'var(--font-sans)' }">
       <button
         :style="{
           background: screen === 'lobby' ? colors.primary : colors['surface-container-low'],
@@ -165,7 +248,7 @@ function isPlaced(row: number, col: number) {
       >
         <h1
           class="text-center mb-6"
-          :style="{ fontFamily: 'EB Garamond, serif', fontSize: '32px', fontWeight: 500, lineHeight: '1.2', color: colors.primary }"
+          :style="{ fontFamily: 'var(--font-serif)', fontSize: '32px', fontWeight: 500, lineHeight: '1.2', color: colors.primary }"
         >
           NEO SCRABBLE
         </h1>
@@ -202,7 +285,7 @@ function isPlaced(row: number, col: number) {
               borderRadius: '0.25rem',
               padding: '12px 16px',
               width: '100%',
-              fontFamily: 'EB Garamond, serif',
+              fontFamily: 'var(--font-serif)',
               fontSize: '18px',
               outline: 'none',
             }"
@@ -216,7 +299,7 @@ function isPlaced(row: number, col: number) {
               borderRadius: '0.25rem',
               padding: '12px 16px',
               width: '100%',
-              fontFamily: 'Work Sans, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontSize: '12px',
               fontWeight: 700,
               letterSpacing: '0.1em',
@@ -235,7 +318,7 @@ function isPlaced(row: number, col: number) {
               borderRadius: '0.25rem',
               padding: '12px 16px',
               width: '100%',
-              fontFamily: 'Work Sans, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontSize: '12px',
               fontWeight: 700,
               letterSpacing: '0.1em',
@@ -256,7 +339,7 @@ function isPlaced(row: number, col: number) {
               borderRadius: '0.25rem',
               padding: '12px 16px',
               width: '100%',
-              fontFamily: 'Work Sans, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontSize: '12px',
               fontWeight: 700,
               letterSpacing: '0.1em',
@@ -278,7 +361,7 @@ function isPlaced(row: number, col: number) {
               padding: '12px 16px',
               width: '100%',
               textAlign: 'center',
-              fontFamily: 'Work Sans, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontSize: '18px',
               fontWeight: 600,
               letterSpacing: '0.3em',
@@ -295,7 +378,7 @@ function isPlaced(row: number, col: number) {
               borderRadius: '0.25rem',
               padding: '12px 16px',
               width: '100%',
-              fontFamily: 'EB Garamond, serif',
+              fontFamily: 'var(--font-serif)',
               fontSize: '18px',
               outline: 'none',
             }"
@@ -309,7 +392,7 @@ function isPlaced(row: number, col: number) {
               borderRadius: '0.25rem',
               padding: '12px 16px',
               width: '100%',
-              fontFamily: 'Work Sans, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontSize: '12px',
               fontWeight: 700,
               letterSpacing: '0.1em',
@@ -330,26 +413,76 @@ function isPlaced(row: number, col: number) {
         }"
         class="flex items-center justify-between px-6 py-3"
       >
-        <span :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">GAME · XY7K9M</span>
+        <span :style="{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">GAME · XY7K9M</span>
         <div class="flex items-center gap-3">
           <button
-            :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors.secondary, border: `1px solid ${colors.outline}`, borderRadius: '0.25rem', padding: '6px 12px', background: 'transparent', cursor: 'pointer', transition: 'all 0.2s' }"
+            :style="{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors.secondary, border: `1px solid ${colors.outline}`, borderRadius: '0.25rem', padding: '6px 12px', background: 'transparent', cursor: 'pointer', transition: 'all 0.2s' }"
             @mouseenter="(e: any) => { e.target.style.background = colors['surface-container-high'] }"
             @mouseleave="(e: any) => { e.target.style.background = 'transparent' }"
           >Theme</button>
           <button
-            :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['surface-container-lowest'], background: colors['tertiary-container'], border: 'none', borderRadius: '0.25rem', padding: '6px 12px', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', transition: 'all 0.2s' }"
+            :style="{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['surface-container-lowest'], background: colors['tertiary-container'], border: 'none', borderRadius: '0.25rem', padding: '6px 12px', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', transition: 'all 0.2s' }"
             @mouseenter="(e: any) => { e.target.style.opacity = '0.85' }"
             @mouseleave="(e: any) => { e.target.style.opacity = '1' }"
           >Leave</button>
         </div>
       </header>
 
-      <!-- Main Content -->
-      <div class="flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 p-6" :style="{ background: colors.surface }">
+      <!-- Main Content (pb-20 insulates controls from the 30px fixed notification bar) -->
+      <div class="flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-center gap-4 p-6 pb-20" :style="{ background: colors.surface }">
+
+        <!-- Player Panel — Opponent (left/top) -->
+        <div class="w-44 flex-shrink-0" :style="{ opacity: players.opp.connected ? 1 : 0.5 }">
+          <div
+            :style="{
+              background: 'rgba(38,38,38,0.4)',
+              borderRadius: '0.375rem',
+              border: '1px solid rgba(96,96,96,0.3)',
+              borderTop: players.opp.turn ? '2px solid #10b981' : '1px solid rgba(96,96,96,0.3)',
+              padding: '14px',
+            }"
+          >
+            <!-- Dot + Name -->
+            <div class="flex items-center gap-2">
+              <span :style="{
+                width: '6px', height: '6px', borderRadius: '50%', display: 'inline-block',
+                background: players.opp.turn ? '#10b981' : '#34d399',
+                boxShadow: players.opp.connected ? '0 0 6px rgba(16,185,129,0.5)' : 'none',
+                animation: players.opp.connected && !players.opp.turn ? 'pulse 2s ease-in-out infinite' : 'none',
+              }"></span>
+              <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '14px', fontWeight: 700, color: '#e5e5e5', letterSpacing: '-0.02em', lineHeight: '1.2' }">{{ players.opp.name }}</span>
+            </div>
+            <!-- Separator -->
+            <div :style="{ borderTop: '1px solid rgba(96,96,96,0.2)', margin: '12px 0 10px' }"></div>
+            <!-- Score (hero) -->
+            <div class="text-center" :style="{ marginBottom: '10px' }">
+              <div :style="{ fontFamily: 'var(--font-panel)', fontSize: '36px', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: '1' }">{{ players.opp.score }}</div>
+            </div>
+            <!-- Separator -->
+            <div :style="{ borderTop: '1px solid rgba(96,96,96,0.2)', marginBottom: '10px' }"></div>
+            <!-- Micro label + Clock -->
+            <div class="flex items-center justify-between">
+              <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', color: '#6b7280' }">TIME</span>
+              <span :style="{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700, letterSpacing: '-0.02em', color: oppTime < 60 ? '#ffb5a0' : '#a3a3a3', fontVariantNumeric: 'tabular-nums' }">{{ formatTime(oppTime) }}</span>
+            </div>
+          </div>
+        </div>
 
         <!-- Board + Rack + Controls -->
         <div class="flex flex-col items-center gap-4">
+          <!-- Bag indicator (standalone) -->
+          <div
+            :style="{
+              background: 'rgba(38,38,38,0.4)',
+              borderRadius: '999px',
+              border: '1px solid rgba(96,96,96,0.3)',
+              padding: '4px 12px',
+            }"
+            class="flex items-center gap-1.5 self-end"
+          >
+            <img :src="bagImg" :style="{ width: '16px', height: '16px' }" alt="bag" />
+            <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '12px', fontWeight: 700, color: '#d4d4d4' }">{{ bagRemaining }}</span>
+          </div>
           <!-- Board - The Artisan Tabletop -->
           <div
             :style="{
@@ -364,7 +497,7 @@ function isPlaced(row: number, col: number) {
               <thead>
                 <tr>
                   <th class="h-5 w-6" />
-                  <th v-for="(label, ci) in COL_LABELS" :key="ci" class="h-5 w-9 text-center" :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">
+                  <th v-for="(label, ci) in COL_LABELS" :key="ci" class="h-5 w-9 text-center" :style="{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">
                     {{ label }}
                   </th>
                   <th class="h-5 w-6" />
@@ -372,7 +505,7 @@ function isPlaced(row: number, col: number) {
               </thead>
               <tbody>
                 <tr v-for="(_, ri) in 15" :key="ri">
-                  <td class="w-6 text-center" :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">{{ ri + 1 }}</td>
+                  <td class="w-6 text-center" :style="{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">{{ ri + 1 }}</td>
                   <td v-for="(_, ci) in 15" :key="ci" class="h-9 w-9 p-[1px]">
                     <div
                       :style="{
@@ -393,23 +526,23 @@ function isPlaced(row: number, col: number) {
                       }"
                     >
                       <!-- Placed tile -->
-                      <span v-if="isPlaced(ri, ci)" :style="{ fontFamily: 'EB Garamond, serif', fontSize: '18px', fontWeight: 600, color: '#1a1a1a', textShadow: '0 1px 0 rgba(255,255,255,0.3)' }">
+                      <span v-if="isPlaced(ri, ci)" :style="{ fontFamily: 'var(--font-serif)', fontSize: '18px', fontWeight: 600, color: '#1a1a1a', textShadow: '0 1px 0 rgba(255,255,255,0.3)' }">
                         {{ tileAt(ri, ci)?.letter }}
-                        <span :style="{ position: 'absolute', bottom: '1px', right: '2px', fontFamily: 'Work Sans, sans-serif', fontSize: '8px', fontWeight: 600, color: '#5a4a3a' }">{{ tileAt(ri, ci)?.points }}</span>
+                        <span :style="{ position: 'absolute', bottom: '1px', right: '2px', fontFamily: 'var(--font-sans)', fontSize: '8px', fontWeight: 600, color: '#5a4a3a' }">{{ tileAt(ri, ci)?.points }}</span>
                       </span>
                       <!-- Premium label -->
-                      <span v-else-if="premiumType(ri, ci) !== 0" :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '8px', fontWeight: 700, letterSpacing: '0.1em', color: cellStyle(premiumType(ri, ci)).color }">
+                      <span v-else-if="premiumType(ri, ci) !== 0" :style="{ fontFamily: 'var(--font-sans)', fontSize: '8px', fontWeight: 700, letterSpacing: '0.1em', color: cellStyle(premiumType(ri, ci)).color }">
                         {{ PREMIUM_LABELS[premiumType(ri, ci)] }}
                       </span>
                     </div>
                   </td>
-                  <td class="w-6 text-center" :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">{{ ri + 1 }}</td>
+                  <td class="w-6 text-center" :style="{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">{{ ri + 1 }}</td>
                 </tr>
               </tbody>
               <tfoot>
                 <tr>
                   <th class="h-5 w-6" />
-                  <th v-for="(label, ci) in COL_LABELS" :key="ci" class="h-5 w-9 text-center" :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">
+                  <th v-for="(label, ci) in COL_LABELS" :key="ci" class="h-5 w-9 text-center" :style="{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">
                     {{ label }}
                   </th>
                   <th class="h-5 w-6" />
@@ -463,9 +596,39 @@ function isPlaced(row: number, col: number) {
                   border: selectedIndex === i ? `1px solid ${colors.primary}` : `1px solid ${colors['outline-variant']}`,
                 }"
               >
-                <span :style="{ fontFamily: 'EB Garamond, serif', fontSize: '20px', fontWeight: 600, color: selectedIndex === i ? colors['on-primary'] : colors['on-surface-variant'], lineHeight: '1', textShadow: selectedIndex === i ? 'none' : '0 1px 2px rgba(0,0,0,0.5)' }">{{ tile.letter }}</span>
-                <span :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '8px', fontWeight: 600, color: selectedIndex === i ? colors['on-primary'] : colors.outline, lineHeight: '1' }">{{ tile.points }}</span>
+                <span :style="{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: selectedIndex === i ? colors['on-primary'] : colors['on-surface-variant'], lineHeight: '1', textShadow: selectedIndex === i ? 'none' : '0 1px 2px rgba(0,0,0,0.5)' }">{{ tile.letter }}</span>
+                <span :style="{ fontFamily: 'var(--font-sans)', fontSize: '8px', fontWeight: 600, color: selectedIndex === i ? colors['on-primary'] : colors.outline, lineHeight: '1' }">{{ tile.points }}</span>
               </div>
+              <!-- Shuffle -->
+              <button
+                @click="shuffleRack"
+                title="Shuffle tiles"
+                :style="{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '36px',
+                  height: '36px',
+                  marginTop: '4px',
+                  background: 'transparent',
+                  border: `1px solid ${colors['outline-variant']}`,
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
+                  color: colors.outline,
+                  transition: 'all 0.15s ease',
+                  alignSelf: 'center',
+                  flexShrink: 0,
+                }"
+                class="hover:opacity-70"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="16 3 21 3 21 8"></polyline>
+                  <line x1="4" y1="20" x2="21" y2="3"></line>
+                  <polyline points="21 16 21 21 16 21"></polyline>
+                  <line x1="15" y1="15" x2="21" y2="21"></line>
+                  <line x1="4" y1="4" x2="9" y2="9"></line>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -479,7 +642,7 @@ function isPlaced(row: number, col: number) {
                 boxShadow: '0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
                 borderRadius: '0.25rem',
                 padding: '8px 20px',
-                fontFamily: 'Work Sans, sans-serif',
+                fontFamily: 'var(--font-sans)',
                 fontSize: '12px',
                 fontWeight: 700,
                 letterSpacing: '0.1em',
@@ -496,7 +659,7 @@ function isPlaced(row: number, col: number) {
                 border: `1px solid ${colors['outline-variant']}`,
                 borderRadius: '0.25rem',
                 padding: '8px 16px',
-                fontFamily: 'Work Sans, sans-serif',
+                fontFamily: 'var(--font-sans)',
                 fontSize: '12px',
                 fontWeight: 700,
                 letterSpacing: '0.1em',
@@ -513,7 +676,7 @@ function isPlaced(row: number, col: number) {
                 border: `1px solid ${colors['outline-variant']}`,
                 borderRadius: '0.25rem',
                 padding: '8px 16px',
-                fontFamily: 'Work Sans, sans-serif',
+                fontFamily: 'var(--font-sans)',
                 fontSize: '12px',
                 fontWeight: 700,
                 letterSpacing: '0.1em',
@@ -530,7 +693,7 @@ function isPlaced(row: number, col: number) {
                 border: `1px solid ${colors['outline-variant']}`,
                 borderRadius: '0.25rem',
                 padding: '8px 16px',
-                fontFamily: 'Work Sans, sans-serif',
+                fontFamily: 'var(--font-sans)',
                 fontSize: '12px',
                 fontWeight: 700,
                 letterSpacing: '0.1em',
@@ -548,7 +711,7 @@ function isPlaced(row: number, col: number) {
                 borderRadius: '0.25rem',
                 padding: '8px 16px',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                fontFamily: 'Work Sans, sans-serif',
+                fontFamily: 'var(--font-sans)',
                 fontSize: '12px',
                 fontWeight: 700,
                 letterSpacing: '0.1em',
@@ -560,20 +723,70 @@ function isPlaced(row: number, col: number) {
             >Forfeit</button>
           </div>
         </div>
+
+        <!-- Player Panel — Current Player (right/bottom) -->
+        <div class="w-44 flex-shrink-0" :style="{ opacity: players.me.connected ? 1 : 0.5 }">
+          <div
+            :style="{
+              background: 'rgba(38,38,38,0.4)',
+              borderRadius: '0.375rem',
+              border: '1px solid rgba(96,96,96,0.3)',
+              borderTop: players.me.turn ? '2px solid #10b981' : '1px solid rgba(96,96,96,0.3)',
+              padding: '14px',
+            }"
+          >
+            <!-- Dot + Name -->
+            <div class="flex items-center gap-2">
+              <span :style="{
+                width: '6px', height: '6px', borderRadius: '50%', display: 'inline-block',
+                background: players.me.turn ? '#10b981' : '#34d399',
+                boxShadow: players.me.connected ? '0 0 6px rgba(16,185,129,0.5)' : 'none',
+                animation: players.me.connected && !players.me.turn ? 'pulse 2s ease-in-out infinite' : 'none',
+              }"></span>
+              <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '14px', fontWeight: 700, color: '#e5e5e5', letterSpacing: '-0.02em', lineHeight: '1.2' }">{{ players.me.name }}</span>
+            </div>
+            <!-- Separator -->
+            <div :style="{ borderTop: '1px solid rgba(96,96,96,0.2)', margin: '12px 0 10px' }"></div>
+            <!-- Score (hero) -->
+            <div class="text-center" :style="{ marginBottom: '10px' }">
+              <div :style="{ fontFamily: 'var(--font-panel)', fontSize: '36px', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: '1' }">{{ players.me.score }}</div>
+            </div>
+            <!-- Separator -->
+            <div :style="{ borderTop: '1px solid rgba(96,96,96,0.2)', marginBottom: '10px' }"></div>
+            <!-- Micro label + Clock -->
+            <div class="flex items-center justify-between">
+              <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', color: '#6b7280' }">TIME</span>
+              <span :style="{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700, letterSpacing: '-0.02em', color: myTime < 60 ? '#ffb5a0' : '#a3a3a3', fontVariantNumeric: 'tabular-nums' }">{{ formatTime(myTime) }}</span>
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Notification Bar -->
+      <!-- Notification Bar (fixed overlay at bottom, does not push content) -->
       <div
+        v-if="notifVisible && notifIndex >= 0"
         :style="{
           background: colors['surface-container-low'],
           borderTop: `1px solid ${colors['outline-variant']}`,
-          boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
         }"
-        class="fixed bottom-0 left-0 right-0 h-14 z-40 flex items-center px-6"
+        class="fixed bottom-0 left-0 right-0 z-50 flex items-center px-4 animate-[slideUp_0.25s_ease-out]"
+        style="height: 30px; cursor: default"
+        @click="dismissNotif"
       >
-        <div class="flex items-center gap-3">
-          <span :style="{ width: '6px', height: '6px', background: colors.primary, borderRadius: '50%', display: 'inline-block' }"></span>
-          <span :style="{ fontFamily: 'EB Garamond, serif', fontSize: '18px', color: colors['on-surface-variant'] }">You played <strong :style="{ color: colors.onSurface }">STARE</strong> for <strong :style="{ color: colors.primary }">24</strong> points</span>
+        <div class="flex items-center gap-2">
+          <span :style="{ width: '6px', height: '6px', background: notifs[notifIndex].dotColor, borderRadius: '50%', display: 'inline-block' }"></span>
+          <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '12px', color: colors['on-surface-variant'], lineHeight: '1' }">
+            <template v-if="notifs[notifIndex].kind === 'self-move'">
+              <strong :style="{ color: colors.onSurface, fontWeight: 600 }">You</strong> played <strong :style="{ color: colors.onSurface, fontWeight: 600 }">STARE</strong> +24
+            </template>
+            <template v-else-if="notifs[notifIndex].kind === 'opponent-move'">
+              <strong :style="{ color: colors.onSurface, fontWeight: 600 }">Jax</strong> played <strong :style="{ color: colors.onSurface, fontWeight: 600 }">QUITE</strong> +18
+            </template>
+            <template v-else>
+              <strong :style="{ color: colors.onSurface, fontWeight: 600 }">Jax</strong> connected
+            </template>
+          </span>
         </div>
       </div>
 
@@ -593,18 +806,18 @@ function isPlaced(row: number, col: number) {
           }"
           class="space-y-6"
         >
-          <h2 :style="{ fontFamily: 'EB Garamond, serif', fontSize: '32px', fontWeight: 600, color: colors['on-surface-variant'], letterSpacing: '-0.02em' }">
+          <h2 :style="{ fontFamily: 'var(--font-serif)', fontSize: '32px', fontWeight: 600, color: colors['on-surface-variant'], letterSpacing: '-0.02em' }">
             GAME OVER
           </h2>
 
           <div class="space-y-1">
-            <div :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">Winner</div>
-            <div :style="{ fontFamily: 'EB Garamond, serif', fontSize: '28px', fontWeight: 500, color: colors.primary }">Neo</div>
-            <div :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '36px', fontWeight: 600, color: colors.onSurface }">137</div>
+            <div :style="{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">Winner</div>
+            <div :style="{ fontFamily: 'var(--font-serif)', fontSize: '28px', fontWeight: 500, color: colors.primary }">Neo</div>
+            <div :style="{ fontFamily: 'var(--font-sans)', fontSize: '36px', fontWeight: 600, color: colors.onSurface }">137</div>
           </div>
 
           <div class="space-y-2">
-            <div :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">Final Scores</div>
+            <div :style="{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', color: colors['on-surface-variant'] }">Final Scores</div>
             <div class="space-y-2">
               <div :style="{
                 display: 'flex',
@@ -615,8 +828,8 @@ function isPlaced(row: number, col: number) {
                 border: `1px solid ${colors['outline-variant']}`,
                 padding: '12px 16px',
               }">
-                <span :style="{ fontFamily: 'EB Garamond, serif', fontSize: '18px', color: colors.onSurface }">Neo</span>
-                <span :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '24px', fontWeight: 600, color: colors.primary }">137</span>
+                <span :style="{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: colors.onSurface }">Neo</span>
+                <span :style="{ fontFamily: 'var(--font-sans)', fontSize: '24px', fontWeight: 600, color: colors.primary }">137</span>
               </div>
               <div :style="{
                 display: 'flex',
@@ -627,8 +840,8 @@ function isPlaced(row: number, col: number) {
                 border: `1px solid ${colors['outline-variant']}`,
                 padding: '12px 16px',
               }">
-                <span :style="{ fontFamily: 'EB Garamond, serif', fontSize: '18px', color: colors.onSurface }">Jax</span>
-                <span :style="{ fontFamily: 'Work Sans, sans-serif', fontSize: '24px', fontWeight: 600, color: colors.tertiary }">112</span>
+                <span :style="{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: colors.onSurface }">Jax</span>
+                <span :style="{ fontFamily: 'var(--font-sans)', fontSize: '24px', fontWeight: 600, color: colors.tertiary }">112</span>
               </div>
             </div>
           </div>
@@ -642,7 +855,7 @@ function isPlaced(row: number, col: number) {
               borderRadius: '0.25rem',
               padding: '12px 24px',
               width: '100%',
-              fontFamily: 'Work Sans, sans-serif',
+              fontFamily: 'var(--font-sans)',
               fontSize: '12px',
               fontWeight: 700,
               letterSpacing: '0.1em',
@@ -658,10 +871,19 @@ function isPlaced(row: number, col: number) {
 </template>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Work+Sans:wght@400;600;700&display=swap');
 
 @keyframes fadeIn {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 </style>

@@ -7,21 +7,26 @@ const store = useGameStore()
 <template>
   <div
     v-if="store.toasts.length"
-    class="fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center gap-2 p-4"
+    class="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center"
+    style="height: 30px; background: var(--color-surface-container-low); border-top: 1px solid var(--color-outline-variant);"
   >
-    <div
-      v-for="toast in store.toasts"
+    <span
+      v-for="toast in store.toasts.slice(0, 1)"
       :key="toast.id"
-      :class="[
-        'w-full max-w-md rounded px-4 py-2 text-center text-sm shadow-lg',
-        toast.type === 'error'
-          ? 'bg-red-700 text-white'
-          : toast.type === 'success'
-            ? 'bg-green-700 text-white'
-            : 'bg-neutral-700 text-white',
-      ]"
+      class="flex items-center gap-2 px-4"
     >
-      {{ toast.text }}
-    </div>
+      <span
+        :style="{
+          width: '6px',
+          height: '6px',
+          borderRadius: '50%',
+          display: 'inline-block',
+          background: toast.type === 'error' ? 'var(--color-tertiary)' : toast.type === 'success' ? '#4caf50' : 'var(--color-outline)',
+        }"
+      />
+      <span style="font-family: var(--font-sans); font-size: 12px; color: var(--color-on-surface-variant); line-height: 1;">
+        <strong style="color: var(--color-on-surface); font-weight: 600;">{{ toast.text }}</strong>
+      </span>
+    </span>
   </div>
 </template>
