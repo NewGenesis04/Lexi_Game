@@ -1,10 +1,10 @@
 import type {
-  CreateGamePayload,
+  CreateGameRequest,
   CreateGameResponse,
-  GameState,
-  JoinGamePayload,
+  GameStateOut,
+  JoinGameRequest,
   JoinGameResponse,
-  MovePayload,
+  MoveRequest,
 } from '../types/game'
 
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
@@ -34,23 +34,28 @@ export class ApiRequestError extends Error {
   }
 }
 
-export function createGame(payload: CreateGamePayload, token?: string) {
+export function createGame(payload: CreateGameRequest) {
   return request<CreateGameResponse>('/games', {
     method: 'POST',
     body: JSON.stringify(payload),
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
 }
 
-export function joinGame(code: string, payload: JoinGamePayload) {
+export function joinGame(code: string, payload: JoinGameRequest) {
   return request<JoinGameResponse>(`/games/${code}/join`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
 }
 
-export function submitMove(code: string, payload: MovePayload, token: string) {
-  return request<{ game: GameState }>(`/games/${code}/moves`, {
+export function fetchGame(code: string, token: string) {
+  return request<GameStateOut>(`/games/${code}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+export function submitMove(code: string, payload: MoveRequest, token: string) {
+  return request<GameStateOut>(`/games/${code}/moves`, {
     method: 'POST',
     body: JSON.stringify(payload),
     headers: { Authorization: `Bearer ${token}` },
@@ -58,12 +63,8 @@ export function submitMove(code: string, payload: MovePayload, token: string) {
 }
 
 export function forfeitGame(code: string, token: string) {
-  return request<{ game: GameState }>(`/games/${code}/forfeit`, {
+  return request<GameStateOut>(`/games/${code}/forfeit`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   })
-}
-
-export function fetchGame(code: string) {
-  return request<GameState>(`/games/${code}`)
 }

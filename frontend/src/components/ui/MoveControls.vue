@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { MovePayload } from '../../types/game'
-import { useGameStore } from '../../stores/game'
 
 const props = defineProps<{
   code: string
@@ -11,46 +9,19 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  submit: []
   clear: []
-  submit: [payload: MovePayload]
+  pass: []
+  forfeit: []
   toggleSwap: []
 }>()
 
-const store = useGameStore()
 const loading = ref(false)
 
 async function handleSubmit() {
   if (!props.hasPlacements && !props.hasSwaps) return
   loading.value = true
-  try {
-    await store.submitMove(props.code, { type: props.hasPlacements ? 'place' : 'swap' })
-  } catch (err) {
-    store.addToast(String(err), 'error')
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handlePass() {
-  loading.value = true
-  try {
-    await store.submitMove(props.code, { type: 'pass' })
-  } catch (err) {
-    store.addToast(String(err), 'error')
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handleForfeit() {
-  loading.value = true
-  try {
-    await store.forfeit(props.code)
-  } catch (err) {
-    store.addToast(String(err), 'error')
-  } finally {
-    loading.value = false
-  }
+  emit('submit')
 }
 </script>
 
@@ -82,14 +53,14 @@ async function handleForfeit() {
     <button
       :disabled="loading"
       class="btn btn--outline"
-      @click="handlePass"
+      @click="emit('pass')"
     >
       Pass
     </button>
     <button
       :disabled="loading"
       class="btn btn--forfeit"
-      @click="handleForfeit"
+      @click="emit('forfeit')"
     >
       Forfeit
     </button>

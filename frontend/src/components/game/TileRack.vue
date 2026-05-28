@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { Tile } from '../../types/game'
+import type { TileOut } from '../../types/game'
 
 const props = defineProps<{
-  tiles: Tile[]
+  tiles: TileOut[]
   selectedIndex: number | null
   placedIndices: Set<number>
   swapMode: boolean

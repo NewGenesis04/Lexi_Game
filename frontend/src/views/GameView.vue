@@ -33,7 +33,7 @@ const {
 
 const code = route.params.code as string
 const myRack = computed(() => store.myPlayer?.rack ?? [])
-const myBoard = computed(() => store.game?.board ?? [])
+const myBoard = computed<(string | null)[][]>(() => store.game?.board ?? [])
 
 const placedIndices = computed(() => {
   const s = new Set<number>()
@@ -44,8 +44,9 @@ const placedIndices = computed(() => {
 })
 
 const winner = computed(() => {
-  if (!store.game || store.game.winner === null) return null
-  return store.game.players[store.game.winner]
+  if (!store.game || store.game.phase !== 'finished') return null
+  const sorted = [...store.game.players].sort((a, b) => b.score - a.score)
+  return sorted[0] ?? null
 })
 
 function handlePlaceTile(row: number, col: number) {
@@ -58,6 +59,22 @@ async function handleSubmit() {
   try {
     await store.submitMove(code, payload)
     clearAll()
+  } catch (err) {
+    store.addToast(String(err), 'error')
+  }
+}
+
+async function handlePass() {
+  try {
+    await store.submitMove(code, { type: 'pass' })
+  } catch (err) {
+    store.addToast(String(err), 'error')
+  }
+}
+
+async function handleForfeit() {
+  try {
+    await store.forfeit(code)
   } catch (err) {
     store.addToast(String(err), 'error')
   }
@@ -95,11 +112,12 @@ function handleLeave() {
     <div class="flex flex-1 flex-col items-center gap-6 p-6 lg:flex-row lg:items-start lg:justify-center" style="padding-bottom: 80px;">
       <PlayerPanel
         :player="store.opponent"
+        :is-active-turn="!store.isMyTurn && store.phase === 'playing'"
+        :connected="store.connected"
         position="top"
       />
 
       <div class="flex flex-col items-center gap-4">
-        <!-- Bag indicator -->
         <div
           class="flex items-center gap-1.5 self-end"
           style="
@@ -111,7 +129,7 @@ function handleLeave() {
         >
           <img :src="bagImg" style="width: 16px; height: 16px;" alt="bag" />
           <span style="font-family: var(--font-panel); font-size: 12px; font-weight: 700; color: #d4d4d4;">
-            {{ store.game?.bag_remaining ?? 0 }}
+            {{ store.game?.bag_size ?? 0 }}
           </span>
         </div>
 
@@ -141,16 +159,19 @@ function handleLeave() {
           @submit="handleSubmit"
           @clear="clearAll"
           @toggle-swap="toggleSwapMode"
+          @pass="handlePass"
+          @forfeit="handleForfeit"
         />
       </div>
 
       <PlayerPanel
         :player="store.myPlayer"
+        :is-active-turn="store.isMyTurn && store.phase === 'playing'"
+        :connected="true"
         position="bottom"
       />
     </div>
 
-    <!-- Game Over overlay -->
     <div
       v-if="store.phase === 'finished'"
       class="fixed inset-0 z-50 flex items-center justify-center"
@@ -193,7 +214,7 @@ function handleLeave() {
               }"
             >
               <span style="font-family: var(--font-serif); font-size: 18px; color: var(--color-on-surface);">{{ p.nickname }}</span>
-              <span style="font-family: var(--font-sans); font-size: 24px; font-weight: 600; color: winner?.nickname === p.nickname ? 'var(--color-primary)' : 'var(--color-tertiary)';">{{ p.score }}</span>
+              <span style="font-family: var(--font-sans); font-size: 24px; font-weight: 600; color: winner?.id === p.id ? 'var(--color-primary)' : 'var(--color-tertiary)';">{{ p.score }}</span>
             </div>
           </div>
         </div>

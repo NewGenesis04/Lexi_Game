@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type {
-  GameState,
+  Dictionary,
   GamePhase,
+  GameStateOut,
+  MoveRequest,
   PlayerSession,
   ToastMessage,
 } from '../types/game'
@@ -14,31 +16,33 @@ import {
   submitMove as apiSubmitMove,
 } from '../services/api'
 import { connectSSE, type SSEConnection } from '../composables/sse'
-import type { MovePayload } from '../types/game'
 
 export const useGameStore = defineStore('game', () => {
-  const game = ref<GameState | null>(null)
+  const game = ref<GameStateOut | null>(null)
   const session = ref<PlayerSession | null>(null)
   const connected = ref(false)
   const toasts = ref<ToastMessage[]>([])
   let sseConnection: SSEConnection | null = null
 
-  const phase = computed<GamePhase>(() => game.value?.phase ?? 'lobby')
-  const isMyTurn = computed(() => {
-    if (!game.value || !session.value) return false
-    return game.value.current_player_index === session.value.player_index
-  })
-  const myPlayerIndex = computed(() => session.value?.player_index ?? 0)
+  const phase = computed<GamePhase>(() => game.value?.phase ?? 'created')
+
   const myPlayer = computed(() => {
-    if (!game.value) return null
-    return game.value.players[session.value?.player_index ?? 0]
-  })
-  const opponent = computed(() => {
-    if (!game.value) return null
-    return game.value.players[session.value?.player_index === 0 ? 1 : 0]
+    if (!game.value || !session.value) return null
+    return game.value.players.find((p) => p.id === session.value!.player_id) ?? null
   })
 
-  function updateLocalState(payload: GameState) {
+  const opponent = computed(() => {
+    if (!game.value || !session.value) return null
+    return game.value.players.find((p) => p.id !== session.value!.player_id) ?? null
+  })
+
+  const isMyTurn = computed(() => {
+    if (!game.value || !session.value) return false
+    const current = game.value.players[game.value.current_player_index]
+    return current?.id === session.value.player_id
+  })
+
+  function updateLocalState(payload: GameStateOut) {
     game.value = payload
   }
 
@@ -54,42 +58,42 @@ export const useGameStore = defineStore('game', () => {
     toasts.value = []
   }
 
-  async function fetchGame(code: string) {
-    const g = await apiFetchGame(code)
+  async function fetchGameState(code: string) {
+    if (!session.value) throw new Error('No session')
+    const g = await apiFetchGame(code, session.value.token)
     updateLocalState(g)
     return g
   }
 
   async function createGame(
     nickname: string,
-    timeLimit: number,
-    dictionary: 'TWL' | 'CSW21',
+    time_per_player_secs: number,
+    dictionary: Dictionary,
   ) {
-    const res = await apiCreateGame({ nickname, time_limit: timeLimit, dictionary })
-    session.value = { token: res.session_token, nickname, player_index: 0 }
-    updateLocalState(res.game)
+    const res = await apiCreateGame({ nickname, time_per_player_secs, dictionary })
+    session.value = { token: res.token, player_id: res.player_id, nickname }
+    const state = await apiFetchGame(res.code, res.token)
+    updateLocalState(state)
     return res
   }
 
   async function joinGame(code: string, nickname: string) {
-    const res = await apiJoinGame(code, { code, nickname })
-    session.value = { token: res.session_token, nickname, player_index: 1 }
-    updateLocalState(res.game)
+    const res = await apiJoinGame(code, { nickname })
+    session.value = { token: res.token, player_id: res.player_id, nickname }
+    updateLocalState(res.state)
     return res
   }
 
-  async function submitMove(code: string, payload: MovePayload) {
+  async function submitMove(code: string, payload: MoveRequest) {
     if (!session.value) throw new Error('No session')
-    const res = await apiSubmitMove(code, payload, session.value.token)
-    updateLocalState(res.game)
-    return res
+    const state = await apiSubmitMove(code, payload, session.value.token)
+    updateLocalState(state)
   }
 
   async function forfeit(code: string) {
     if (!session.value) throw new Error('No session')
-    const res = await apiForfeit(code, session.value.token)
-    updateLocalState(res.game)
-    return res
+    const state = await apiForfeit(code, session.value.token)
+    updateLocalState(state)
   }
 
   function connectSSEStream() {
@@ -99,7 +103,7 @@ export const useGameStore = defineStore('game', () => {
     }
     const url = `${import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'}/events?token=${session.value.token}`
     sseConnection = connectSSE(url, (data) => {
-      updateLocalState(data as GameState)
+      updateLocalState(data as GameStateOut)
     })
     connected.value = true
   }
@@ -125,14 +129,13 @@ export const useGameStore = defineStore('game', () => {
     connected,
     toasts,
     phase,
-    isMyTurn,
-    myPlayerIndex,
     myPlayer,
     opponent,
+    isMyTurn,
     updateLocalState,
     addToast,
     clearToasts,
-    fetchGame,
+    fetchGameState,
     createGame,
     joinGame,
     submitMove,

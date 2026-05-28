@@ -1,97 +1,104 @@
-export interface Position {
+/* ── Rack tile (TileOut) ─────────────────── */
+export interface TileOut {
+  letter: string
+  points: number
+}
+
+/* ── Placed tile (PlacedTileIn / PlacedTileOut) ─ */
+export interface PlacedTileIn {
   row: number
   col: number
-}
-
-export interface Tile {
   letter: string
-  plays_as?: string
+  plays_as?: string | null
 }
 
-export interface PlacedTile extends Position {
+export interface PlacedTileOut {
+  row: number
+  col: number
   letter: string
-  plays_as?: string
 }
 
-export type MoveType = 'place' | 'swap' | 'pass'
+/* ── Move types ──────────────────────────── */
+export type MoveType = 'place' | 'swap' | 'pass' | 'forfeit'
 
-export interface MovePayload {
+export interface MoveOut {
   type: MoveType
-  tiles?: PlacedTile[]
-  letters?: string[]
+  player_id: string
+  tiles: PlacedTileOut[]
 }
 
-export type GamePhase = 'lobby' | 'playing' | 'adjourned' | 'paused' | 'finished'
-
-export interface PlayerState {
+/* ── Player (PlayerOut) ──────────────────── */
+export interface PlayerOut {
   id: string
   nickname: string
-  rack: Tile[]
   score: number
-  time_remaining: number
-  connected: boolean
-  is_current_player: boolean
+  time_remaining_secs: number
+  rack: TileOut[]  // empty list for opponent
 }
 
-export interface MoveRecord {
-  type: MoveType
-  player_index: number
-  tiles?: PlacedTile[]
-  letters?: string[]
-  score?: number
-  words_formed?: string[]
-  timestamp: string
-}
+/* ── Game state (GameStateOut) ────────────── */
+export type GamePhase = 'created' | 'playing' | 'paused' | 'finished'
+export type Dictionary = 'TWL06' | 'CSW21'
 
-export interface GameState {
+export interface GameStateOut {
   code: string
-  board: (Tile | null)[][]
-  bag_remaining: number
-  players: [PlayerState, PlayerState]
-  current_player_index: number
   phase: GamePhase
-  move_history: MoveRecord[]
-  dictionary: 'TWL' | 'CSW21'
+  dictionary: Dictionary
+  board: (string | null)[][]
+  bag_size: number
+  players: PlayerOut[]
+  current_player_index: number
   consecutive_passes: number
-  last_move: MoveRecord | null
-  time_limit: number
-  winner: number | null
-  created_at: string
-  updated_at: string
+  last_move: MoveOut | null
 }
 
-export interface CreateGamePayload {
+/* ── API request / response bodies ────────── */
+export interface CreateGameRequest {
   nickname: string
-  time_limit: number
-  dictionary: 'TWL' | 'CSW21'
+  dictionary: Dictionary
+  time_per_player_secs: number
 }
 
 export interface CreateGameResponse {
   code: string
-  session_token: string
-  game: GameState
+  token: string
+  player_id: string
 }
 
-export interface JoinGamePayload {
-  code: string
+export interface JoinGameRequest {
   nickname: string
 }
 
 export interface JoinGameResponse {
-  session_token: string
-  game: GameState
+  token: string
+  player_id: string
+  state: GameStateOut
 }
 
+export interface PlaceMoveRequest {
+  type: 'place'
+  tiles: PlacedTileIn[]
+}
+
+export interface SwapMoveRequest {
+  type: 'swap'
+  letters: string[]
+}
+
+export interface PassMoveRequest {
+  type: 'pass'
+}
+
+export type MoveRequest = PlaceMoveRequest | SwapMoveRequest | PassMoveRequest
+
+/* ── Session (internal) ───────────────────── */
 export interface PlayerSession {
   token: string
+  player_id: string
   nickname: string
-  player_index: number
 }
 
-export interface ApiError {
-  detail: string
-}
-
+/* ── UI types ──────────────────────────────── */
 export interface ToastMessage {
   id: string
   text: string
@@ -99,3 +106,7 @@ export interface ToastMessage {
 }
 
 export type PremiumType = 'normal' | 'dl' | 'tl' | 'dw' | 'tw' | 'center'
+
+export interface ApiError {
+  detail: string
+}

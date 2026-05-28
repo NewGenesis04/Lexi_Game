@@ -9,7 +9,7 @@ const router = useRouter()
 const tab = ref<'create' | 'join'>('create')
 const nickname = ref('')
 const timeLimit = ref(300)
-const dictionary = ref<'TWL' | 'CSW21'>('TWL')
+const dictionary = ref<'TWL06' | 'CSW21'>('TWL06')
 const joinCode = ref('')
 const loading = ref(false)
 
@@ -58,7 +58,6 @@ async function handleJoin() {
         NEO SCRABBLE
       </h1>
 
-      <!-- Tab bar -->
       <div
         class="flex rounded-sm mb-6"
         style="background: var(--color-surface-container-lowest); padding: 2px;"
@@ -87,7 +86,6 @@ async function handleJoin() {
         </button>
       </div>
 
-      <!-- Create form -->
       <form
         v-if="tab === 'create'"
         class="space-y-4"
@@ -127,7 +125,7 @@ async function handleJoin() {
             outline: none;
           "
         >
-          <option value="TWL">North American (TWL)</option>
+          <option value="TWL06">North American (TWL)</option>
           <option value="CSW21">International (CSW21)</option>
         </select>
         <select
@@ -147,10 +145,11 @@ async function handleJoin() {
             outline: none;
           "
         >
-          <option :value="60">1 min per player</option>
-          <option :value="180">3 min per player</option>
           <option :value="300">5 min per player</option>
           <option :value="600">10 min per player</option>
+          <option :value="900">15 min per player</option>
+          <option :value="1200">20 min per player</option>
+          <option :value="1800">30 min per player</option>
         </select>
         <button
           :disabled="loading"
@@ -176,7 +175,6 @@ async function handleJoin() {
         </button>
       </form>
 
-      <!-- Join form -->
       <form
         v-if="tab === 'join'"
         class="space-y-4"

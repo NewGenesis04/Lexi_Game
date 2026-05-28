@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { Tile } from '../../types/game'
 import { PREMIUM_LAYOUT, PREMIUM_LABELS } from '../../constants/board'
 
 const props = defineProps<{
-  board: (Tile | null)[][]
+  board: (string | null)[][]
   ghostAt: (row: number, col: number) => { rackIndex: number; row: number; col: number } | undefined
   blankLetterAt: (row: number, col: number) => string | undefined
   hasSelection: boolean
@@ -24,8 +23,8 @@ const pickerPos = ref<{ row: number; col: number } | null>(null)
 function handleCellClick(row: number, col: number) {
   const ghost = props.ghostAt(row, col)
   if (ghost) {
-    const tile = props.board[row]?.[col]
-    if (tile?.letter === ' ') {
+    const cell = props.board[row]?.[col]
+    if (cell === ' ') {
       pickerPos.value = { row, col }
     } else {
       emit('removeGhost', row, col)
@@ -50,17 +49,12 @@ function premium(row: number, col: number) {
 
 <template>
   <div class="relative">
-    <!-- Board container -->
     <div class="board-container">
       <table class="board-table">
         <thead>
           <tr>
             <th class="h-5 w-6" />
-            <th
-              v-for="(label, ci) in COL_LABELS"
-              :key="ci"
-              class="h-5 w-9 text-center label"
-            >
+            <th v-for="(label, ci) in COL_LABELS" :key="ci" class="h-5 w-9 text-center label">
               {{ label }}
             </th>
             <th class="h-5 w-6" />
@@ -69,11 +63,7 @@ function premium(row: number, col: number) {
         <tbody>
           <tr v-for="(row, ri) in board" :key="ri">
             <td class="w-6 text-center label">{{ ri + 1 }}</td>
-            <td
-              v-for="(_, ci) in row"
-              :key="ci"
-              class="p-[1px]"
-            >
+            <td v-for="(_, ci) in row" :key="ci" class="p-[1px]">
               <div
                 class="cell"
                 :class="{
@@ -84,16 +74,10 @@ function premium(row: number, col: number) {
                 }"
                 @click="handleCellClick(ri, ci)"
               >
-                <!-- Placed tile -->
-                <template v-if="board[ri]?.[ci]">
-                  <span class="tile-letter">{{ board[ri][ci]!.letter }}</span>
-                  <span class="tile-points">{{ board[ri][ci]!.plays_as === '' ? '' : (board[ri][ci]!.plays_as ?? '') }}</span>
-                </template>
-                <!-- Ghost tile -->
+                <span v-if="board[ri]?.[ci]" class="tile-letter">{{ board[ri][ci]!.toUpperCase() }}</span>
                 <template v-else-if="ghostAt(ri, ci)">
                   <span class="ghost-letter">{{ blankLetterAt(ri, ci) ?? '?' }}</span>
                 </template>
-                <!-- Premium label -->
                 <span v-else-if="premium(ri, ci) !== 'normal'" class="premium-label">
                   {{ PREMIUM_LABELS[premium(ri, ci)] }}
                 </span>
@@ -105,11 +89,7 @@ function premium(row: number, col: number) {
         <tfoot>
           <tr>
             <th class="h-5 w-6" />
-            <th
-              v-for="(label, ci) in COL_LABELS"
-              :key="ci"
-              class="h-5 w-9 text-center label"
-            >
+            <th v-for="(label, ci) in COL_LABELS" :key="ci" class="h-5 w-9 text-center label">
               {{ label }}
             </th>
             <th class="h-5 w-6" />
@@ -118,7 +98,6 @@ function premium(row: number, col: number) {
       </table>
     </div>
 
-    <!-- Empty state -->
     <div
       v-if="!board.length"
       class="absolute inset-0 flex items-center justify-center"
@@ -127,26 +106,14 @@ function premium(row: number, col: number) {
       Loading board…
     </div>
 
-    <!-- Blank-letter picker -->
-    <div
-      v-if="pickerPos"
-      class="blank-picker"
-    >
+    <div v-if="pickerPos" class="blank-picker">
       <div class="blank-picker__title">Choose letter for blank</div>
       <div class="blank-picker__grid">
-        <button
-          v-for="letter in LETTERS"
-          :key="letter"
-          class="blank-picker__btn"
-          @click="pickLetter(letter)"
-        >
+        <button v-for="letter in LETTERS" :key="letter" class="blank-picker__btn" @click="pickLetter(letter)">
           {{ letter }}
         </button>
       </div>
-      <button
-        class="blank-picker__cancel"
-        @click="pickerPos = null"
-      >
+      <button class="blank-picker__cancel" @click="pickerPos = null">
         Cancel
       </button>
     </div>
@@ -154,7 +121,6 @@ function premium(row: number, col: number) {
 </template>
 
 <style scoped>
-/* ── Board container ───────────────────────── */
 .board-container {
   display: inline-block;
   border-radius: var(--radius-board);
@@ -169,7 +135,6 @@ function premium(row: number, col: number) {
   border-spacing: 1px;
 }
 
-/* ── Labels (row/col headers) ────────────── */
 .label {
   font-family: var(--font-sans);
   font-size: 12px;
@@ -178,7 +143,6 @@ function premium(row: number, col: number) {
   color: var(--color-on-surface-variant);
 }
 
-/* ── Cells ─────────────────────────────────── */
 .cell {
   width: 34px;
   height: 34px;
@@ -199,7 +163,6 @@ function premium(row: number, col: number) {
   box-shadow: var(--shadow-cell-inset), 0 0 0 1px var(--color-outline);
 }
 
-/* ── Placed-tile cell ──────────────────────── */
 .cell--occupied {
   background: var(--color-placed-tile-bg);
   border: 1px solid var(--color-outline);
@@ -214,18 +177,6 @@ function premium(row: number, col: number) {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-.tile-points {
-  position: absolute;
-  bottom: 1px;
-  right: 2px;
-  font-family: var(--font-sans);
-  font-size: 8px;
-  font-weight: 600;
-  color: var(--color-placed-tile-points);
-  line-height: 1;
-}
-
-/* ── Ghost tile ────────────────────────────── */
 .cell--ghost {
   background: rgba(212, 197, 169, 0.35);
   border: 2px solid var(--color-active-turn);
@@ -239,7 +190,6 @@ function premium(row: number, col: number) {
   color: var(--color-active-turn);
 }
 
-/* ── Premium squares ───────────────────────── */
 .cell--dl  { background: var(--color-premium-dl-bg);  border: 1px solid var(--color-outline-variant); }
 .cell--tl  { background: var(--color-premium-tl-bg);  border: 1px solid var(--color-outline-variant); }
 .cell--dw  { background: var(--color-premium-dw-bg);  border: 1px solid var(--color-outline-variant); }
@@ -259,7 +209,6 @@ function premium(row: number, col: number) {
 .cell--tw  .premium-label { color: var(--color-premium-tw-label); }
 .cell--center .premium-label { color: var(--color-premium-center-label); }
 
-/* ── Blank-letter picker ───────────────────── */
 .blank-picker {
   position: absolute;
   left: 50%;
@@ -320,7 +269,6 @@ function premium(row: number, col: number) {
   padding: 4px 8px;
   border: none;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
 .blank-picker__cancel:hover {

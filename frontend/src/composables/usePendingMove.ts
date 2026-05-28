@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import type { PlacedTile, MovePayload, Tile } from '../types/game'
+import type { MoveRequest, PlacedTileIn, TileOut } from '../types/game'
 
 interface GhostTile {
   rackIndex: number
@@ -17,8 +17,8 @@ export function usePendingMove() {
   const hasPendingPlacements = computed(() => ghosts.value.size > 0)
   const hasSwapSelection = computed(() => swapIndices.value.size > 0)
 
-  function buildPlacePayload(rack: Tile[]): PlacedTile[] {
-    const out: PlacedTile[] = []
+  function buildPlacePayload(rack: TileOut[]): PlacedTileIn[] {
+    const out: PlacedTileIn[] = []
     for (const g of ghosts.value.values()) {
       const tile = rack[g.rackIndex]
       if (!tile) continue
@@ -26,23 +26,23 @@ export function usePendingMove() {
         ? (blankLetterMap.value.get(`${g.row},${g.col}`) ?? '?')
         : tile.letter
       const plays_as = tile.letter === ' '
-        ? blankLetterMap.value.get(`${g.row},${g.col}`)
-        : (tile.plays_as ?? undefined)
+        ? blankLetterMap.value.get(`${g.row},${g.col}`) ?? null
+        : null
       out.push({ row: g.row, col: g.col, letter, plays_as })
     }
     return out
   }
 
-  function buildSwapPayload(): string[] {
-    return [...swapIndices.value].map(() => '')
+  function buildSwapPayload(rack: TileOut[]): string[] {
+    return [...swapIndices.value].map((i) => rack[i]?.letter ?? '')
   }
 
-  function buildMovePayload(rack: Tile[]): MovePayload | null {
+  function buildMovePayload(rack: TileOut[]): MoveRequest | null {
     if (ghosts.value.size > 0) {
       return { type: 'place', tiles: buildPlacePayload(rack) }
     }
     if (swapIndices.value.size > 0) {
-      return { type: 'swap', letters: buildSwapPayload() }
+      return { type: 'swap', letters: buildSwapPayload(rack) }
     }
     return null
   }
@@ -59,7 +59,7 @@ export function usePendingMove() {
     selectedRackIndex.value = selectedRackIndex.value === index ? null : index
   }
 
-  function tryPlaceTile(row: number, col: number, rack: Tile[]): boolean {
+  function tryPlaceTile(row: number, col: number, rack: TileOut[]): boolean {
     if (selectedRackIndex.value === null) return false
     const key = `${row},${col}`
     if (ghosts.value.has(key)) return false

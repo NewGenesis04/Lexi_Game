@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { PlayerState } from '../../types/game'
+import type { PlayerOut } from '../../types/game'
 
 const props = defineProps<{
-  player: PlayerState | null
+  player: PlayerOut | null
   position: 'top' | 'bottom'
+  isActiveTurn: boolean
+  connected: boolean
 }>()
 
 function formatTime(seconds: number) {
@@ -15,14 +17,14 @@ function formatTime(seconds: number) {
 
 const dotState = computed(() => {
   if (!props.player) return { background: '#6b7280', boxShadow: 'none', animation: 'none' }
-  if (props.player.is_current_player && props.player.connected) {
+  if (props.isActiveTurn && props.connected) {
     return {
       background: '#10b981',
       boxShadow: '0 0 6px rgba(16,185,129,0.5)',
       animation: 'none',
     }
   }
-  if (props.player.connected) {
+  if (props.connected) {
     return {
       background: '#34d399',
       boxShadow: '0 0 6px rgba(16,185,129,0.5)',
@@ -36,18 +38,17 @@ const dotState = computed(() => {
 <template>
   <div
     class="w-44 flex-shrink-0"
-    :style="{ opacity: player?.connected !== false ? 1 : 0.5 }"
+    :style="{ opacity: connected !== false ? 1 : 0.5 }"
   >
     <div
       :style="{
         background: 'rgba(38,38,38,0.4)',
         borderRadius: 'var(--radius-panel)',
         border: '1px solid rgba(96,96,96,0.3)',
-        borderTop: player?.is_current_player && player?.connected ? '2px solid #10b981' : '1px solid rgba(96,96,96,0.3)',
+        borderTop: isActiveTurn && connected ? '2px solid #10b981' : '1px solid rgba(96,96,96,0.3)',
         padding: '14px',
       }"
     >
-      <!-- Dot + Name -->
       <div class="flex items-center gap-2">
         <span
           :style="{
@@ -74,10 +75,8 @@ const dotState = computed(() => {
         </span>
       </div>
 
-      <!-- Separator -->
       <div :style="{ borderTop: '1px solid rgba(96,96,96,0.2)', margin: '12px 0 10px' }" />
 
-      <!-- Score (hero) -->
       <template v-if="player">
         <div class="text-center" :style="{ marginBottom: '10px' }">
           <div :style="{ fontFamily: 'var(--font-panel)', fontSize: '36px', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: '1' }">
@@ -85,14 +84,12 @@ const dotState = computed(() => {
           </div>
         </div>
 
-        <!-- Separator -->
         <div :style="{ borderTop: '1px solid rgba(96,96,96,0.2)', marginBottom: '10px' }" />
 
-        <!-- Micro label + Clock -->
         <div class="flex items-center justify-between">
           <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', color: '#6b7280' }">TIME</span>
-          <span :style="{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700, letterSpacing: '-0.02em', color: player.time_remaining < 60 ? 'var(--color-panel-clock-warning)' : 'var(--color-panel-clock)', fontVariantNumeric: 'tabular-nums' }">
-            {{ formatTime(player.time_remaining) }}
+          <span :style="{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700, letterSpacing: '-0.02em', color: player.time_remaining_secs < 60 ? 'var(--color-panel-clock-warning)' : 'var(--color-panel-clock)', fontVariantNumeric: 'tabular-nums' }">
+            {{ formatTime(player.time_remaining_secs) }}
           </span>
         </div>
       </template>
