@@ -14,10 +14,12 @@ from backend_api.routes import events, games
 load_dotenv()
 
 _REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-_CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
-).split(",")
+_CORS_ORIGINS = [
+    s.strip() for s in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+]
 
 
 @asynccontextmanager

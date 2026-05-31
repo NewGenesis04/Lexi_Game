@@ -23,6 +23,7 @@ export const useGameStore = defineStore('game', () => {
   const connected = ref(false)
   const toasts = ref<ToastMessage[]>([])
   let sseConnection: SSEConnection | null = null
+  let previousOvertimeCounts: Record<string, number> = {}
 
   const phase = computed<GamePhase>(() => game.value?.phase ?? 'created')
 
@@ -43,6 +44,13 @@ export const useGameStore = defineStore('game', () => {
   })
 
   function updateLocalState(payload: GameStateOut) {
+    for (const player of payload.players) {
+      const prev = previousOvertimeCounts[player.id] ?? 0
+      if (prev === 0 && player.overtime_count > 0) {
+        addToast(`${player.nickname} ran out of time! −10 points. +60s overtime granted.`, 'error')
+      }
+      previousOvertimeCounts[player.id] = player.overtime_count
+    }
     game.value = payload
   }
 

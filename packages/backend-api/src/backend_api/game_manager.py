@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 _locks: dict[str, asyncio.Lock] = {}
 _timers: dict[str, asyncio.Task] = {}
+_turn_started_at: dict[str, float] = {}
 
 
 def get_lock(code: str) -> asyncio.Lock:
@@ -25,3 +27,16 @@ def cancel_timer(code: str) -> None:
 def remove_game(code: str) -> None:
     _locks.pop(code, None)
     cancel_timer(code)
+    _turn_started_at.pop(code, None)
+
+
+def set_turn_started(code: str) -> None:
+    _turn_started_at[code] = time.monotonic()
+
+
+def get_elapsed(code: str) -> float:
+    return time.monotonic() - _turn_started_at.get(code, time.monotonic())
+
+
+def clear_turn_started(code: str) -> None:
+    _turn_started_at.pop(code, None)

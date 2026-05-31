@@ -14,10 +14,10 @@ from backend_api.session import PlayerSession
 
 
 class _EnumEncoder(json.JSONEncoder):
-    def default(self, obj: Any) -> Any:
-        if isinstance(obj, Enum):
-            return obj.value
-        return super().default(obj)
+    def default(self, o: Any) -> Any:
+        if isinstance(o, Enum):
+            return o.value
+        return super().default(o)
 
 
 def _to_json(obj: Any) -> str:
@@ -67,7 +67,7 @@ def _state_from_dict(d: dict) -> GameState:
     raw_board = d["board"]
     state.board = raw_board
     state.last_move = _move_from_dict(d.get("last_move"))
-    state.move_history = [_move_from_dict(m) for m in d.get("move_history", [])]
+    state.move_history = [m for raw in d.get("move_history", []) if (m := _move_from_dict(raw)) is not None]
     return state
 
 
@@ -106,10 +106,10 @@ class GameRepo:
         await self._r.delete(f"session:{token}")
 
     async def register_active(self, code: str) -> None:
-        await self._r.sadd("active_games", code)
+        await self._r.sadd("active_games", code)  # type: ignore[misc]
 
     async def deregister_active(self, code: str) -> None:
-        await self._r.srem("active_games", code)
+        await self._r.srem("active_games", code)  # type: ignore[misc]
 
     async def active_codes(self) -> set[str]:
-        return await self._r.smembers("active_games")
+        return await self._r.smembers("active_games")  # type: ignore[misc]

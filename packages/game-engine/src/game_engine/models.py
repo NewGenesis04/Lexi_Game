@@ -52,6 +52,7 @@ class Player:
     rack: list[Tile] = field(default_factory=list)
     time_remaining_secs: float = 0.0
     score: int = 0
+    overtime_count: int = 0
 
 
 Board = list[list[str | None]]  # 15×15; None = empty, str = letter placed

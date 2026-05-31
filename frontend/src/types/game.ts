@@ -25,6 +25,7 @@ export interface MoveOut {
   type: MoveType
   player_id: string
   tiles: PlacedTileOut[]
+  letters: string[]
 }
 
 /* ── Player (PlayerOut) ──────────────────── */
@@ -33,6 +34,7 @@ export interface PlayerOut {
   nickname: string
   score: number
   time_remaining_secs: number
+  overtime_count: number
   rack: TileOut[]  // empty list for opponent
 }
 

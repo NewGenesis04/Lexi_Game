@@ -88,6 +88,7 @@ class MoveOut(BaseModel):
     type: MoveType
     player_id: str
     tiles: list[PlacedTileOut]
+    letters: list[str]
 
     @classmethod
     def from_domain(cls, move: Move) -> MoveOut:
@@ -95,6 +96,7 @@ class MoveOut(BaseModel):
             type=move.type,
             player_id=move.player_id,
             tiles=[PlacedTileOut.from_domain(t) for t in move.tiles],
+            letters=move.letters,
         )
 
 
@@ -103,6 +105,7 @@ class PlayerOut(BaseModel):
     nickname: str
     score: int
     time_remaining_secs: float
+    overtime_count: int
     rack: list[TileOut]
 
     @classmethod
@@ -112,6 +115,7 @@ class PlayerOut(BaseModel):
             nickname=player.nickname,
             score=player.score,
             time_remaining_secs=player.time_remaining_secs,
+            overtime_count=player.overtime_count,
             rack=[TileOut.from_domain(t) for t in player.rack] if is_self else [],
         )
 

@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from game_engine.models import (  # type: ignore
     Dictionary, GamePhase, GameState, Move, MoveType, Player, PlacedTile, Tile,
 )
+from backend_api import game_manager
 from backend_api.services.game_service import GameService  # type: ignore
 from backend_api.session import PlayerSession  # type: ignore
 
@@ -257,3 +258,96 @@ async def test_forfeit_ends_game(repo, svc):
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED
     assert s.last_move.type == MoveType.FORFEIT
+
+
+# ---------------------------------------------------------------------------
+# time deduction (_deduct_time)
+# ---------------------------------------------------------------------------
+
+async def test_deduct_time_subtracts_from_active_player(repo, svc):
+    await repo.save_game(_state())
+    tiles = [
+        PlacedTile(row=7, col=7, letter="C"),
+        PlacedTile(row=7, col=8, letter="A"),
+        PlacedTile(row=7, col=9, letter="T"),
+    ]
+    with patch("backend_api.game_manager.get_elapsed", return_value=5.0):
+        await svc.place_tiles("ABCD12", "p1", tiles)
+    s = await repo.load_game("ABCD12")
+    assert s.players[0].time_remaining_secs == pytest.approx(175.0, abs=0.01)
+    assert s.players[1].time_remaining_secs == 180.0
+
+
+async def test_deduct_time_floor_at_zero(repo, svc):
+    await repo.save_game(_state())
+    tiles = [
+        PlacedTile(row=7, col=7, letter="C"),
+        PlacedTile(row=7, col=8, letter="A"),
+        PlacedTile(row=7, col=9, letter="T"),
+    ]
+    with patch("backend_api.game_manager.get_elapsed", return_value=999.0):
+        await svc.place_tiles("ABCD12", "p1", tiles)
+    s = await repo.load_game("ABCD12")
+    assert s.players[0].time_remaining_secs == 0.0
+
+
+async def test_deduct_time_clears_turn_started(repo, svc):
+    await repo.save_game(_state())
+    game_manager.set_turn_started("ABCD12")
+    tiles = [PlacedTile(row=7, col=7, letter="C")]
+    with patch("backend_api.services.game_service.bag_module.draw_tiles") as mock_draw:
+        mock_draw.return_value = ([], [])
+        await svc.place_tiles("ABCD12", "p1", tiles)
+    assert game_manager.get_elapsed("ABCD12") < 1.0  # was reset, so elapsed is near-zero
+
+
+# ---------------------------------------------------------------------------
+# time bank / overtime (_time_bank_task)
+# ---------------------------------------------------------------------------
+
+async def test_overtime_first_timeout_penalty(repo, svc):
+    """1st timeout: -10 points, reset to 60s, overtime_count=1."""
+    await repo.save_game(_state())
+    with patch("asyncio.create_task") as mock_ct:
+        await svc._time_bank_task("ABCD12", "p1", 0.001)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+    assert s.players[0].score == -10
+    assert s.players[0].time_remaining_secs == 60.0
+    assert s.players[0].overtime_count == 1
+    mock_ct.assert_called_once()
+
+
+async def test_overtime_second_timeout_forfeit(repo, svc):
+    """2nd timeout: forfeit the player."""
+    state = _state()
+    state.players[0].overtime_count = 1
+    state.players[0].time_remaining_secs = 60.0
+    await repo.save_game(state)
+    await svc._time_bank_task("ABCD12", "p1", 0.001)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.FINISHED
+    assert s.players[0].time_remaining_secs == 0.0
+    assert s.last_move.type == MoveType.FORFEIT
+
+
+async def test_overtime_no_op_when_wrong_player(repo, svc):
+    """Timeout fires but current player has changed — should be a no-op."""
+    state = _state()
+    state.current_player_index = 1
+    await repo.save_game(state)
+    await svc._time_bank_task("ABCD12", "p1", 0.001)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+    assert s.players[0].score == 0
+    assert s.players[0].overtime_count == 0
+
+
+async def test_overtime_no_op_when_game_over(repo, svc):
+    """Timeout fires after game has already ended — should be a no-op."""
+    state = _state()
+    state.phase = GamePhase.FINISHED
+    await repo.save_game(state)
+    await svc._time_bank_task("ABCD12", "p1", 0.001)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.FINISHED

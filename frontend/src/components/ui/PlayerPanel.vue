@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import type { PlayerOut } from '../../types/game'
 
 const props = defineProps<{
@@ -8,6 +8,44 @@ const props = defineProps<{
   isActiveTurn: boolean
   connected: boolean
 }>()
+
+const displaySeconds = ref(0)
+let serverBase = 0
+let baseTimestamp = 0
+let ticker: ReturnType<typeof setInterval> | null = null
+
+function stopTicker() {
+  if (ticker !== null) {
+    clearInterval(ticker)
+    ticker = null
+  }
+}
+
+function startTicker() {
+  stopTicker()
+  ticker = setInterval(() => {
+    const elapsed = (Date.now() - baseTimestamp) / 1000
+    displaySeconds.value = Math.max(0, Math.ceil(serverBase - elapsed))
+  }, 1000)
+}
+
+watch(() => props.player?.time_remaining_secs, (val) => {
+  if (val !== undefined) {
+    serverBase = val
+    baseTimestamp = Date.now()
+    displaySeconds.value = Math.ceil(val)
+  }
+}, { immediate: true })
+
+watch(() => props.isActiveTurn, (active) => {
+  if (active && props.player) {
+    startTicker()
+  } else {
+    stopTicker()
+  }
+}, { immediate: true })
+
+onUnmounted(() => stopTicker())
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60)
@@ -87,9 +125,12 @@ const dotState = computed(() => {
         <div :style="{ borderTop: '1px solid rgba(96,96,96,0.2)', marginBottom: '10px' }" />
 
         <div class="flex items-center justify-between">
-          <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', color: '#6b7280' }">TIME</span>
-          <span :style="{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700, letterSpacing: '-0.02em', color: player.time_remaining_secs < 60 ? 'var(--color-panel-clock-warning)' : 'var(--color-panel-clock)', fontVariantNumeric: 'tabular-nums' }">
-            {{ formatTime(player.time_remaining_secs) }}
+          <div class="flex items-center gap-1">
+            <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', color: '#6b7280' }">TIME</span>
+            <span v-if="player?.overtime_count && player.overtime_count > 0" :style="{ background: '#dc2626', color: '#fff', fontSize: '9px', fontWeight: 900, padding: '1px 5px', borderRadius: '3px', lineHeight: '1.4' }">OT</span>
+          </div>
+          <span :style="{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700, letterSpacing: '-0.02em', color: player?.overtime_count && player.overtime_count > 0 ? '#dc2626' : (displaySeconds < 60 ? 'var(--color-panel-clock-warning)' : 'var(--color-panel-clock)'), fontVariantNumeric: 'tabular-nums' }">
+            {{ formatTime(displaySeconds) }}
           </span>
         </div>
       </template>

@@ -4,6 +4,7 @@ import asyncio
 import json
 import random
 import string
+import time
 import uuid
 
 from fastapi import HTTPException
@@ -66,38 +67,39 @@ class GameService:
         return CreateGameOut(code=code, token=token, player_id=player_id)
 
     async def join_game(self, code: str, nickname: str) -> JoinGameOut:
-        state = await self._load_or_404(code)
-        if state.phase != GamePhase.CREATED:
-            raise HTTPException(status_code=400, detail="Game already started")
-        if len(state.players) >= 2:
-            raise HTTPException(status_code=400, detail="Game is full")
+        async with game_manager.get_lock(code):
+            state = await self._load_or_404(code)
+            if state.phase != GamePhase.CREATED:
+                raise HTTPException(status_code=400, detail="Game already started")
+            if len(state.players) >= 2:
+                raise HTTPException(status_code=400, detail="Game is full")
 
-        player_id = str(uuid.uuid4())
-        token = generate_token()
+            player_id = str(uuid.uuid4())
+            token = generate_token()
 
-        rack, new_bag = bag_module.draw_tiles(state.bag, 7)
-        state.bag = new_bag
-        state.players.append(
-            Player(
-                id=player_id,
-                nickname=nickname,
-                rack=rack,
-                time_remaining_secs=state.players[0].time_remaining_secs,
+            rack, new_bag = bag_module.draw_tiles(state.bag, 7)
+            state.bag = new_bag
+            state.players.append(
+                Player(
+                    id=player_id,
+                    nickname=nickname,
+                    rack=rack,
+                    time_remaining_secs=state.players[0].time_remaining_secs,
+                )
             )
-        )
-        state.phase = GamePhase.PLAYING
+            state.phase = GamePhase.PLAYING
 
-        await self._repo.save_game(state)
-        await self._repo.save_session(token, PlayerSession(
-            token=token, player_id=player_id, game_code=code, nickname=nickname
-        ))
-        self._start_timer(state)
+            await self._repo.save_game(state)
+            await self._repo.save_session(token, PlayerSession(
+                token=token, player_id=player_id, game_code=code, nickname=nickname
+            ))
+            self._start_timer(state)
 
-        return JoinGameOut(
-            token=token,
-            player_id=player_id,
-            state=GameStateOut.from_domain(state, viewer_id=player_id),
-        )
+            return JoinGameOut(
+                token=token,
+                player_id=player_id,
+                state=GameStateOut.from_domain(state, viewer_id=player_id),
+            )
 
     async def get_game(self, code: str, player_id: str) -> GameStateOut:
         state = await self._load_or_404(code)
@@ -126,10 +128,14 @@ class GameService:
 
             remaining = list(player.rack)
             for pt in placed:
+                found = False
                 for i, t in enumerate(remaining):
                     if t.letter == pt.letter:
                         remaining.pop(i)
+                        found = True
                         break
+                if not found:
+                    raise HTTPException(status_code=422, detail="Placed tile not in rack")
 
             drawn, state.bag = bag_module.draw_tiles(state.bag, len(placed))
             player.rack = remaining + drawn
@@ -145,6 +151,7 @@ class GameService:
                 game_manager.remove_game(code)
                 return GameStateOut.from_domain(state, viewer_id=player_id)
 
+            self._deduct_time(state, code)
             self._advance_turn(state)
             await self._repo.save_game(state)
             self._start_timer(state)
@@ -181,6 +188,7 @@ class GameService:
             state.move_history.append(move)
             state.consecutive_passes = 0
 
+            self._deduct_time(state, code)
             self._advance_turn(state)
             await self._repo.save_game(state)
             self._start_timer(state)
@@ -205,6 +213,7 @@ class GameService:
                 game_manager.remove_game(code)
                 return GameStateOut.from_domain(state, viewer_id=player_id)
 
+            self._deduct_time(state, code)
             self._advance_turn(state)
             await self._repo.save_game(state)
             self._start_timer(state)
@@ -214,6 +223,7 @@ class GameService:
 
     async def forfeit(self, code: str, player_id: str) -> GameStateOut:
         async with game_manager.get_lock(code):
+            game_manager.clear_turn_started(code)
             state = await self._load_or_404(code)
             state.phase = GamePhase.FINISHED
             move = Move(type=MoveType.FORFEIT, player_id=player_id, tiles=[], letters=[])
@@ -262,7 +272,14 @@ class GameService:
         state.phase = GamePhase.FINISHED
         return True
 
+    def _deduct_time(self, state: GameState, code: str) -> None:
+        elapsed = game_manager.get_elapsed(code)
+        game_manager.clear_turn_started(code)
+        player = state.players[state.current_player_index]
+        player.time_remaining_secs = max(0.0, player.time_remaining_secs - elapsed)
+
     def _start_timer(self, state: GameState) -> None:
+        game_manager.set_turn_started(state.code)
         player = state.players[state.current_player_index]
         task = asyncio.create_task(
             self._time_bank_task(state.code, player.id, player.time_remaining_secs)
@@ -277,14 +294,28 @@ class GameService:
                 return
             if state.players[state.current_player_index].id != player_id:
                 return
-            state.players[state.current_player_index].time_remaining_secs = 0.0
-            state.phase = GamePhase.FINISHED
-            move = Move(type=MoveType.FORFEIT, player_id=player_id, tiles=[], letters=[])
-            state.last_move = move
-            state.move_history.append(move)
-            await self._repo.save_game(state)
-            await self._broadcast(state)
-            game_manager.remove_game(code)
+
+            player = state.players[state.current_player_index]
+            if player.overtime_count == 0:
+                player.score -= 10
+                player.time_remaining_secs = 60.0
+                player.overtime_count = 1
+                game_manager.set_turn_started(code)
+                await self._repo.save_game(state)
+                await self._broadcast(state)
+                task = asyncio.create_task(
+                    self._time_bank_task(code, player_id, 60.0)
+                )
+                game_manager.set_timer(code, task)
+            else:
+                player.time_remaining_secs = 0.0
+                state.phase = GamePhase.FINISHED
+                move = Move(type=MoveType.FORFEIT, player_id=player_id, tiles=[], letters=[])
+                state.last_move = move
+                state.move_history.append(move)
+                await self._repo.save_game(state)
+                await self._broadcast(state)
+                game_manager.remove_game(code)
 
     async def _broadcast(self, state: GameState) -> None:
         tokens = sse_manager.tokens_for_game(state.code)
