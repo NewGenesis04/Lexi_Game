@@ -35,6 +35,7 @@ export interface PlayerOut {
   score: number
   time_remaining_secs: number
   overtime_count: number
+  connected: boolean
   rack: TileOut[]  // empty list for opponent
 }
 

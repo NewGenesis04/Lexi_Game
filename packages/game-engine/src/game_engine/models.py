@@ -72,3 +72,4 @@ class GameState:
     consecutive_passes: int = 0
     last_move: Move | None = None
     paused_time_left: float | None = None
+    paused_at: float | None = None

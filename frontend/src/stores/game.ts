@@ -67,6 +67,17 @@ export const useGameStore = defineStore('game', () => {
       }
     }
 
+    // Pause / resume notifications
+    if (prev?.phase === 'playing' && payload.phase === 'paused') {
+      const disconnected = payload.players.find(p => !p.connected)
+      if (disconnected) {
+        addToast(`${disconnected.nickname} disconnected — game paused`, 'warning')
+      }
+    }
+    if (prev?.phase === 'paused' && payload.phase === 'playing') {
+      addToast('Both players connected — game resumed!', 'success')
+    }
+
     game.value = payload
   }
 

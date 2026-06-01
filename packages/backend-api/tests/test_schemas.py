@@ -1,4 +1,4 @@
-from game_engine.models import GamePhase, Dictionary, Player, Tile  # type: ignore
+from game_engine.models import Player, Tile  # type: ignore
 from backend_api.schemas import PlayerOut  # type: ignore
 
 
@@ -33,3 +33,16 @@ def test_player_out_other_fields_always_present():
     assert out.nickname == "Bob"
     assert out.score == 10
     assert out.time_remaining_secs == 180.0
+    assert out.connected is False
+
+
+def test_player_out_connected_propagates():
+    player = _make_player()
+    out = PlayerOut.from_domain(player, is_self=False, connected=True)
+    assert out.connected is True
+
+
+def test_player_out_connected_defaults_false():
+    player = _make_player()
+    out = PlayerOut.from_domain(player, is_self=False)
+    assert out.connected is False

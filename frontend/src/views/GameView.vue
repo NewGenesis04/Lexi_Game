@@ -226,9 +226,96 @@ function handlePlayAgain() {
       <PlayerPanel
         :player="store.myPlayer"
         :is-active-turn="store.isMyTurn && store.phase === 'playing'"
-        :connected="true"
+        :connected="store.myPlayer?.connected ?? true"
         position="bottom"
       />
+    </div>
+
+    <div
+      v-if="store.phase === 'paused'"
+      class="fixed inset-0 z-50 flex items-center justify-center"
+      style="background: rgba(19,19,19,0.85);"
+    >
+      <div
+        class="text-center"
+        style="
+          background: var(--color-surface-container-low);
+          border-radius: 0.5rem;
+          border: 1px solid var(--color-outline-variant);
+          box-shadow: var(--shadow-overlay);
+          padding: 32px;
+          max-width: 360px;
+          width: 100%;
+        "
+      >
+        <h2 :style="{
+          fontFamily: 'var(--font-serif)',
+          fontSize: '28px',
+          fontWeight: 600,
+          letterSpacing: '-0.02em',
+          lineHeight: '1.1',
+          color: '#f59e0b',
+        }">
+          GAME PAUSED
+        </h2>
+        <p :style="{
+          fontFamily: 'var(--font-sans)',
+          fontSize: '12px',
+          fontWeight: 700,
+          letterSpacing: '0.1em',
+          marginTop: '12px',
+          color: 'var(--color-on-surface-variant)',
+        }">
+          A player disconnected. Waiting for reconnection…
+        </p>
+        <div v-if="store.game" class="mt-6 space-y-2">
+          <div
+            v-for="(p, i) in store.game.players"
+            :key="i"
+            class="flex items-center justify-between"
+            :style="{
+              background: 'var(--color-surface-container)',
+              borderRadius: '0.375rem',
+              border: '1px solid var(--color-outline-variant)',
+              padding: '10px 14px',
+              opacity: p.connected ? 1 : 0.5,
+            }"
+          >
+            <span style="font-family: var(--font-serif); font-size: 16px; color: var(--color-on-surface);">{{ p.nickname }}</span>
+            <span :style="{
+              fontFamily: 'var(--font-sans)',
+              fontSize: '10px',
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              color: p.connected ? '#10b981' : '#6b7280',
+            }">
+              {{ p.connected ? 'CONNECTED' : 'DISCONNECTED' }}
+            </span>
+          </div>
+        </div>
+        <button
+          class="w-full mt-6"
+          style="
+            background: linear-gradient(180deg, var(--color-outline), #8a7d7b);
+            color: var(--color-surface-container-lowest);
+            border: none;
+            box-shadow: var(--shadow-button-filled);
+            border-radius: 0.25rem;
+            padding: 12px 24px;
+            font-family: var(--font-sans);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s;
+          "
+          @mouseenter="(e: any) => { e.target.style.opacity = '0.85' }"
+          @mouseleave="(e: any) => { e.target.style.opacity = '1' }"
+          @click="handleLeave"
+        >
+          Leave Game
+        </button>
+      </div>
     </div>
 
     <div

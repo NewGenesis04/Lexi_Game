@@ -4,11 +4,10 @@ from unittest.mock import AsyncMock, patch
 from fastapi import HTTPException
 
 from game_engine.models import (  # type: ignore
-    Dictionary, GamePhase, GameState, Move, MoveType, Player, PlacedTile, Tile,
+    Dictionary, GamePhase, GameState, MoveType, Player, PlacedTile, Tile,
 )
 from backend_api import game_manager
 from backend_api.services.game_service import GameService  # type: ignore
-from backend_api.session import PlayerSession  # type: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -72,9 +71,16 @@ def mock_side_effects():
         patch("backend_api.game_manager.set_timer"),
         patch("backend_api.game_manager.cancel_timer"),
         patch("backend_api.game_manager.remove_game"),
+        patch("backend_api.game_manager.set_pause_timer"),
+        patch("backend_api.game_manager.cancel_pause_timer"),
         patch("backend_api.sse_manager.broadcast", new_callable=AsyncMock),
     ):
         yield
+
+
+@pytest.fixture(autouse=True)
+def clear_game_manager():
+    game_manager._connected.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -249,6 +255,175 @@ async def test_six_passes_ends_game(repo, svc):
 
 
 # ---------------------------------------------------------------------------
+# connect_player / disconnect_player / pause / resume
+# ---------------------------------------------------------------------------
+
+async def test_connect_player_marks_connected(repo, svc):
+    state = _state()
+    await repo.save_game(state)
+    assert game_manager.is_player_connected("ABCD12", "p1") is False
+    await svc.connect_player("ABCD12", "p1")
+    assert game_manager.is_player_connected("ABCD12", "p1") is True
+    assert game_manager.is_player_connected("ABCD12", "p2") is False
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+
+
+async def test_connect_player_resumes_when_both_connected(repo, svc):
+    state = _state()
+    state.phase = GamePhase.PAUSED
+    state.paused_time_left = 90.0
+    state.paused_at = 1000.0
+    state.players[0].time_remaining_secs = 90.0
+    await repo.save_game(state)
+    game_manager.mark_connected("ABCD12", "p1")
+    await svc.connect_player("ABCD12", "p2")
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+    assert game_manager.is_player_connected("ABCD12", "p1") is True
+    assert game_manager.is_player_connected("ABCD12", "p2") is True
+    assert s.players[0].time_remaining_secs == 90.0  # restored from paused_time_left
+    assert s.paused_time_left is None
+    assert s.paused_at is None
+
+
+async def test_connect_player_stays_paused_if_other_offline(repo, svc):
+    state = _state()
+    state.phase = GamePhase.PAUSED
+    await repo.save_game(state)
+    await svc.connect_player("ABCD12", "p1")
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PAUSED
+    assert game_manager.is_player_connected("ABCD12", "p1") is True
+    assert game_manager.is_player_connected("ABCD12", "p2") is False
+
+
+async def test_connect_player_does_nothing_for_created(repo, svc):
+    state = _state()
+    state.phase = GamePhase.CREATED
+    await repo.save_game(state)
+    await svc.connect_player("ABCD12", "p1")
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.CREATED
+
+
+async def test_connect_player_does_nothing_for_finished(repo, svc):
+    state = _state()
+    state.phase = GamePhase.FINISHED
+    await repo.save_game(state)
+    await svc.connect_player("ABCD12", "p1")
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.FINISHED
+
+
+async def test_disconnect_player_pauses_playing_game(repo, svc):
+    state = _state()
+    await repo.save_game(state)
+    game_manager.mark_connected("ABCD12", "p1")
+    game_manager.mark_connected("ABCD12", "p2")
+    with (
+        patch("backend_api.game_manager.get_elapsed", return_value=5.0),
+        patch("backend_api.game_manager.set_pause_timer"),
+    ):
+        await svc.disconnect_player("ABCD12", "p1")
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PAUSED
+    assert game_manager.is_player_connected("ABCD12", "p1") is False
+    assert game_manager.is_player_connected("ABCD12", "p2") is True
+    assert s.paused_time_left is not None
+    assert s.paused_at is not None
+    assert s.paused_time_left == 175.0  # 180 - 5 elapsed
+
+
+async def test_disconnect_player_does_nothing_for_created(repo, svc):
+    state = _state()
+    state.phase = GamePhase.CREATED
+    await repo.save_game(state)
+    await svc.disconnect_player("ABCD12", "p1")
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.CREATED
+
+
+async def test_disconnect_player_does_nothing_for_finished(repo, svc):
+    state = _state()
+    state.phase = GamePhase.FINISHED
+    await repo.save_game(state)
+    await svc.disconnect_player("ABCD12", "p1")
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.FINISHED
+
+
+async def test_disconnect_player_unknown_player_is_noop(repo, svc):
+    state = _state()
+    await repo.save_game(state)
+    await svc.disconnect_player("ABCD12", "unknown")
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+
+
+async def test_pause_game_freezes_clock_for_active_player(repo, svc):
+    state = _state()
+    state.current_player_index = 0  # Alice is active
+    await repo.save_game(state)
+    game_manager.set_turn_started("ABCD12")
+    elapsed = game_manager.get_elapsed("ABCD12")
+    svc._pause_game(state)
+    assert state.phase == GamePhase.PAUSED
+    assert state.paused_time_left == pytest.approx(180.0 - elapsed, abs=2.0)
+    assert state.paused_at is not None
+
+
+async def test_resume_game_restores_clock(repo, svc):
+    state = _state()
+    state.phase = GamePhase.PAUSED
+    state.paused_time_left = 90.0
+    state.paused_at = 1000.0
+    with patch("backend_api.game_manager.cancel_pause_timer"), \
+         patch("backend_api.game_manager.set_turn_started"), \
+         patch("asyncio.create_task"):
+        svc._resume_game(state)
+    assert state.phase == GamePhase.PLAYING
+    assert state.players[0].time_remaining_secs == 90.0
+    assert state.paused_time_left is None
+    assert state.paused_at is None
+
+
+async def test_disconnect_grace_task_forfeit_when_one_player_connected(repo, svc):
+    state = _state()
+    state.phase = GamePhase.PAUSED
+    await repo.save_game(state)
+    game_manager.mark_connected("ABCD12", "p1")
+    await svc._disconnect_grace_task("ABCD12", grace_secs=0.001)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.FINISHED
+    assert s.last_move.type == MoveType.TIMEOUT
+    assert s.last_move.player_id == "p2"  # p2 is the loser (disconnected)
+
+
+async def test_disconnect_grace_task_both_offline_stays_paused(repo, svc):
+    state = _state()
+    state.phase = GamePhase.PAUSED
+    await repo.save_game(state)
+    await svc._disconnect_grace_task("ABCD12", grace_secs=0.001)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PAUSED  # stays paused for GC
+
+
+async def test_disconnect_grace_task_no_op_if_game_resumed(repo, svc):
+    state = _state()
+    state.phase = GamePhase.PLAYING  # game was resumed
+    await repo.save_game(state)
+    await svc._disconnect_grace_task("ABCD12", grace_secs=0.001)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING  # no change
+
+
+async def test_disconnect_grace_task_no_op_if_game_deleted(repo, svc):
+    # No game saved — task should not crash
+    await svc._disconnect_grace_task("ABCD12", grace_secs=0.001)
+
+
+# ---------------------------------------------------------------------------
 # forfeit
 # ---------------------------------------------------------------------------
 
@@ -279,6 +454,7 @@ async def test_deduct_time_subtracts_from_active_player(repo, svc):
 
 
 async def test_deduct_time_floor_at_zero(repo, svc):
+    """Huge elapsed triggers first overtime: +60s extension, overtime_count=1."""
     await repo.save_game(_state())
     tiles = [
         PlacedTile(row=7, col=7, letter="C"),
@@ -288,7 +464,8 @@ async def test_deduct_time_floor_at_zero(repo, svc):
     with patch("backend_api.game_manager.get_elapsed", return_value=999.0):
         await svc.place_tiles("ABCD12", "p1", tiles)
     s = await repo.load_game("ABCD12")
-    assert s.players[0].time_remaining_secs == 0.0
+    assert s.players[0].time_remaining_secs == 60.0
+    assert s.players[0].overtime_count == 1
 
 
 async def test_deduct_time_clears_turn_started(repo, svc):
@@ -328,7 +505,7 @@ async def test_overtime_second_timeout_forfeit(repo, svc):
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED
     assert s.players[0].time_remaining_secs == 0.0
-    assert s.last_move.type == MoveType.FORFEIT
+    assert s.last_move.type == MoveType.TIMEOUT
 
 
 async def test_overtime_no_op_when_wrong_player(repo, svc):

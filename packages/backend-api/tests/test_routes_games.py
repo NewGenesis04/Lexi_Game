@@ -30,8 +30,8 @@ def _state_out(code: str = "ABCD12") -> GameStateOut:
         board=[[None] * 15 for _ in range(15)],
         bag_size=86,
         players=[
-            PlayerOut(id="p1", nickname="Alice", score=0, time_remaining_secs=180.0, overtime_count=0, rack=[]),
-            PlayerOut(id="p2", nickname="Bob", score=0, time_remaining_secs=180.0, overtime_count=0, rack=[]),
+            PlayerOut(id="p1", nickname="Alice", score=0, time_remaining_secs=180.0, overtime_count=0, connected=False, rack=[]),
+            PlayerOut(id="p2", nickname="Bob", score=0, time_remaining_secs=180.0, overtime_count=0, connected=False, rack=[]),
         ],
         current_player_index=0,
         consecutive_passes=0,

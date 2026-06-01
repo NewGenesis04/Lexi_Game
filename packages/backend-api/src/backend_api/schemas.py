@@ -106,16 +106,18 @@ class PlayerOut(BaseModel):
     score: int
     time_remaining_secs: float
     overtime_count: int
+    connected: bool
     rack: list[TileOut]
 
     @classmethod
-    def from_domain(cls, player: Player, *, is_self: bool) -> PlayerOut:
+    def from_domain(cls, player: Player, *, is_self: bool, connected: bool = False) -> PlayerOut:
         return cls(
             id=player.id,
             nickname=player.nickname,
             score=player.score,
             time_remaining_secs=player.time_remaining_secs,
             overtime_count=player.overtime_count,
+            connected=connected,
             rack=[TileOut.from_domain(t) for t in player.rack] if is_self else [],
         )
 
@@ -132,7 +134,7 @@ class GameStateOut(BaseModel):
     last_move: MoveOut | None
 
     @classmethod
-    def from_domain(cls, state: GameState, *, viewer_id: str) -> GameStateOut:
+    def from_domain(cls, state: GameState, *, viewer_id: str, connected_map: dict[str, bool] | None = None) -> GameStateOut:
         return cls(
             code=state.code,
             phase=state.phase,
@@ -140,7 +142,11 @@ class GameStateOut(BaseModel):
             board=state.board,
             bag_size=len(state.bag),
             players=[
-                PlayerOut.from_domain(p, is_self=(p.id == viewer_id))
+                PlayerOut.from_domain(
+                    p,
+                    is_self=(p.id == viewer_id),
+                    connected=connected_map.get(p.id, False) if connected_map else False,
+                )
                 for p in state.players
             ],
             current_player_index=state.current_player_index,

@@ -9,6 +9,8 @@ import uuid
 
 from fastapi import HTTPException
 
+import math
+
 from game_engine import bag as bag_module, board as board_module, scoring
 from game_engine import dictionary as dict_module
 from game_engine.models import (
@@ -98,12 +100,12 @@ class GameService:
             return JoinGameOut(
                 token=token,
                 player_id=player_id,
-                state=GameStateOut.from_domain(state, viewer_id=player_id),
+                state=self._to_view(state, viewer_id=player_id),
             )
 
     async def get_game(self, code: str, player_id: str) -> GameStateOut:
         state = await self._load_or_404(code)
-        return GameStateOut.from_domain(state, viewer_id=player_id)
+        return self._to_view(state, viewer_id=player_id)
 
     async def place_tiles(
         self, code: str, player_id: str, placed: list[PlacedTile]
@@ -149,7 +151,7 @@ class GameService:
                 await self._repo.save_game(state)
                 await self._broadcast(state)
                 game_manager.remove_game(code)
-                return GameStateOut.from_domain(state, viewer_id=player_id)
+                return self._to_view(state, viewer_id=player_id)
 
             if self._deduct_time(state, code):
                 return await self._end_by_timeout(state, code, player_id)
@@ -159,7 +161,7 @@ class GameService:
             self._start_timer(state)
             await self._broadcast(state)
 
-        return GameStateOut.from_domain(state, viewer_id=player_id)
+        return self._to_view(state, viewer_id=player_id)
 
     async def swap_tiles(
         self, code: str, player_id: str, letters: list[str]
@@ -198,7 +200,7 @@ class GameService:
             self._start_timer(state)
             await self._broadcast(state)
 
-        return GameStateOut.from_domain(state, viewer_id=player_id)
+        return self._to_view(state, viewer_id=player_id)
 
     async def pass_turn(self, code: str, player_id: str) -> GameStateOut:
         async with game_manager.get_lock(code):
@@ -215,7 +217,7 @@ class GameService:
                 await self._repo.save_game(state)
                 await self._broadcast(state)
                 game_manager.remove_game(code)
-                return GameStateOut.from_domain(state, viewer_id=player_id)
+                return self._to_view(state, viewer_id=player_id)
 
             if self._deduct_time(state, code):
                 return await self._end_by_timeout(state, code, player_id)
@@ -225,7 +227,7 @@ class GameService:
             self._start_timer(state)
             await self._broadcast(state)
 
-        return GameStateOut.from_domain(state, viewer_id=player_id)
+        return self._to_view(state, viewer_id=player_id)
 
     async def forfeit(self, code: str, player_id: str) -> GameStateOut:
         async with game_manager.get_lock(code):
@@ -239,11 +241,124 @@ class GameService:
             await self._broadcast(state)
             game_manager.remove_game(code)
 
-        return GameStateOut.from_domain(state, viewer_id=player_id)
+        return self._to_view(state, viewer_id=player_id)
+
+    # -----------------------------------------------------------------------
+    # Disconnect / Adjournment
+    # -----------------------------------------------------------------------
+
+    async def connect_player(self, code: str, player_id: str) -> None:
+        """Mark a player as connected. If game was PAUSED and both are back, resume."""
+        async with game_manager.get_lock(code):
+            state = await self._load_or_404(code)
+            if state.phase not in (GamePhase.PLAYING, GamePhase.PAUSED):
+                return
+
+            if not any(p.id == player_id for p in state.players):
+                return
+            game_manager.mark_connected(code, player_id)
+
+            if state.phase == GamePhase.PAUSED:
+                cmap = game_manager.get_connected(code)
+                all_connected = all(
+                    cmap.get(p.id, False) for p in state.players
+                )
+                if all_connected:
+                    self._resume_game(state)
+                    await self._repo.save_game(state)
+                    await self._broadcast(state)
+                    return
+
+            await self._repo.save_game(state)
+
+    async def disconnect_player(self, code: str, player_id: str) -> None:
+        """Mark a player as disconnected. Freeze clock and pause if game was live."""
+        async with game_manager.get_lock(code):
+            state = await self._load_or_404(code)
+            if state.phase not in (GamePhase.PLAYING, GamePhase.PAUSED):
+                return
+
+            if not any(p.id == player_id for p in state.players):
+                return
+            game_manager.mark_disconnected(code, player_id)
+
+            if state.phase == GamePhase.PLAYING:
+                self._pause_game(state)
+                await self._repo.save_game(state)
+                await self._broadcast(state)
+            elif state.phase == GamePhase.PAUSED:
+                await self._repo.save_game(state)
+
+            self._spawn_disconnect_grace_task(state)
+
+    def _pause_game(self, state: GameState) -> None:
+        """Freeze the active turn clock and transition to PAUSED."""
+        elapsed = game_manager.get_elapsed(state.code)
+        game_manager.clear_turn_started(state.code)
+        player = state.players[state.current_player_index]
+        new_time = player.time_remaining_secs - elapsed
+        new_time = math.floor(max(0.0, new_time))
+
+        state.paused_time_left = new_time
+        state.paused_at = time.time()
+        state.phase = GamePhase.PAUSED
+
+    def _resume_game(self, state: GameState) -> None:
+        """Restore from paused and transition back to PLAYING."""
+        game_manager.cancel_pause_timer(state.code)
+        player = state.players[state.current_player_index]
+        if state.paused_time_left is not None:
+            player.time_remaining_secs = state.paused_time_left
+        state.paused_time_left = None
+        state.paused_at = None
+        state.phase = GamePhase.PLAYING
+        self._start_timer(state)
+
+    def _spawn_disconnect_grace_task(self, state: GameState) -> None:
+        """Spawn or reset the 5-minute grace timer for a paused game."""
+        task = asyncio.create_task(
+            self._disconnect_grace_task(state.code, grace_secs=300.0)
+        )
+        game_manager.set_pause_timer(state.code, task)
+
+    async def _disconnect_grace_task(self, code: str, grace_secs: float = 300.0) -> None:
+        """5-minute grace period (configurable via grace_secs). After expiry, forfeit against the disconnected player."""
+        try:
+            await asyncio.sleep(grace_secs)
+        except asyncio.CancelledError:
+            return
+
+        async with game_manager.get_lock(code):
+            state = await self._repo.load_game(code)
+            if state is None or state.phase != GamePhase.PAUSED:
+                return
+            game_manager.cancel_pause_timer(code)
+
+            cmap = game_manager.get_connected(code)
+            connected_ids = [pid for pid, c in cmap.items() if c]
+            if len(connected_ids) == 1:
+                winner_id = connected_ids[0]
+                loser = next(p for p in state.players if p.id != winner_id)
+                state.phase = GamePhase.FINISHED
+                move = Move(type=MoveType.TIMEOUT, player_id=loser.id, tiles=[], letters=[])
+                state.last_move = move
+                state.move_history.append(move)
+                state.paused_time_left = None
+                state.paused_at = None
+                await self._repo.save_game(state)
+                await self._broadcast(state)
+                game_manager.remove_game(code)
 
     # -----------------------------------------------------------------------
     # Internal helpers
     # -----------------------------------------------------------------------
+
+    def _to_view(self, state: GameState, viewer_id: str) -> GameStateOut:
+        return GameStateOut.from_domain(
+            state,
+            viewer_id=viewer_id,
+            connected_map=game_manager.get_connected(state.code),
+        )
 
     async def _load_or_404(self, code: str) -> GameState:
         state = await self._repo.load_game(code)
@@ -353,7 +468,7 @@ class GameService:
         await self._repo.save_game(state)
         await self._broadcast(state)
         game_manager.remove_game(code)
-        return GameStateOut.from_domain(state, viewer_id=viewer_id)
+        return self._to_view(state, viewer_id=viewer_id)
 
     async def _broadcast(self, state: GameState) -> None:
         tokens = sse_manager.tokens_for_game(state.code)
@@ -362,6 +477,6 @@ class GameService:
             session = await self._repo.load_session(token)
             if session is None:
                 continue
-            view = GameStateOut.from_domain(state, viewer_id=session.player_id)
+            view = self._to_view(state, viewer_id=session.player_id)
             payloads[token] = json.dumps(view.model_dump(mode="json"))
         await sse_manager.broadcast(payloads)
