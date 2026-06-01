@@ -19,7 +19,7 @@ export interface PlacedTileOut {
 }
 
 /* ── Move types ──────────────────────────── */
-export type MoveType = 'place' | 'swap' | 'pass' | 'forfeit'
+export type MoveType = 'place' | 'swap' | 'pass' | 'forfeit' | 'timeout'
 
 export interface MoveOut {
   type: MoveType
@@ -104,7 +104,7 @@ export interface PlayerSession {
 export interface ToastMessage {
   id: string
   text: string
-  type: 'error' | 'info' | 'success'
+  type: 'error' | 'info' | 'success' | 'warning'
 }
 
 export type PremiumType = 'normal' | 'dl' | 'tl' | 'dw' | 'tw' | 'center'

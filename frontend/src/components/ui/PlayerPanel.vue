@@ -39,6 +39,8 @@ watch(() => props.player?.time_remaining_secs, (val) => {
 
 watch(() => props.isActiveTurn, (active) => {
   if (active && props.player) {
+    baseTimestamp = Date.now()
+    displaySeconds.value = Math.ceil(serverBase)
     startTicker()
   } else {
     stopTicker()

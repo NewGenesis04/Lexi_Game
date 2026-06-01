@@ -44,13 +44,29 @@ export const useGameStore = defineStore('game', () => {
   })
 
   function updateLocalState(payload: GameStateOut) {
+    const prev = game.value
+
+    // Overtime first-strike notification (count goes 0 → 1)
     for (const player of payload.players) {
-      const prev = previousOvertimeCounts[player.id] ?? 0
-      if (prev === 0 && player.overtime_count > 0) {
-        addToast(`${player.nickname} ran out of time! −10 points. +60s overtime granted.`, 'error')
+      const prevCount = previousOvertimeCounts[player.id] ?? 0
+      if (prevCount === 0 && player.overtime_count > 0) {
+        addToast(`${player.nickname} ran out of time — −10 pts, +60s overtime`, 'warning')
       }
       previousOvertimeCounts[player.id] = player.overtime_count
     }
+
+    // Forfeit notification (opponent pressed Leave while game was live)
+    if (
+      payload.phase === 'finished' &&
+      prev?.phase !== 'finished' &&
+      payload.last_move?.type === 'forfeit'
+    ) {
+      const forfeiter = payload.players.find(p => p.id === payload.last_move?.player_id)
+      if (forfeiter && forfeiter.id !== session.value?.player_id) {
+        addToast(`${forfeiter.nickname} forfeited. You win!`, 'success')
+      }
+    }
+
     game.value = payload
   }
 
@@ -129,6 +145,7 @@ export const useGameStore = defineStore('game', () => {
     game.value = null
     session.value = null
     toasts.value = []
+    previousOvertimeCounts = {}
   }
 
   return {

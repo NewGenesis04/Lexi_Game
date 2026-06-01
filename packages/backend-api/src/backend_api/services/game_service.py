@@ -151,7 +151,9 @@ class GameService:
                 game_manager.remove_game(code)
                 return GameStateOut.from_domain(state, viewer_id=player_id)
 
-            self._deduct_time(state, code)
+            if self._deduct_time(state, code):
+                return await self._end_by_timeout(state, code, player_id)
+
             self._advance_turn(state)
             await self._repo.save_game(state)
             self._start_timer(state)
@@ -188,7 +190,9 @@ class GameService:
             state.move_history.append(move)
             state.consecutive_passes = 0
 
-            self._deduct_time(state, code)
+            if self._deduct_time(state, code):
+                return await self._end_by_timeout(state, code, player_id)
+
             self._advance_turn(state)
             await self._repo.save_game(state)
             self._start_timer(state)
@@ -213,7 +217,9 @@ class GameService:
                 game_manager.remove_game(code)
                 return GameStateOut.from_domain(state, viewer_id=player_id)
 
-            self._deduct_time(state, code)
+            if self._deduct_time(state, code):
+                return await self._end_by_timeout(state, code, player_id)
+
             self._advance_turn(state)
             await self._repo.save_game(state)
             self._start_timer(state)
@@ -272,11 +278,31 @@ class GameService:
         state.phase = GamePhase.FINISHED
         return True
 
-    def _deduct_time(self, state: GameState, code: str) -> None:
+    def _deduct_time(self, state: GameState, code: str) -> bool:
+        """
+        Deducts elapsed time from the current player's bank.
+        - First overspend: applies −10 penalty, resets bank to 60 s, increments overtime_count.
+        - Second overspend: sets bank to 0 s and returns True (caller must end the game).
+        Returns True only when the second overtime fires and a forfeit is required.
+        """
         elapsed = game_manager.get_elapsed(code)
         game_manager.clear_turn_started(code)
         player = state.players[state.current_player_index]
-        player.time_remaining_secs = max(0.0, player.time_remaining_secs - elapsed)
+        new_time = player.time_remaining_secs - elapsed
+
+        if new_time > 0:
+            player.time_remaining_secs = new_time
+            return False
+
+        if player.overtime_count == 0:
+            player.score -= 10
+            player.overtime_count = 1
+            player.time_remaining_secs = 60.0
+            return False
+
+        # Second overspend — caller must end the game
+        player.time_remaining_secs = 0.0
+        return True
 
     def _start_timer(self, state: GameState) -> None:
         game_manager.set_turn_started(state.code)
@@ -310,12 +336,24 @@ class GameService:
             else:
                 player.time_remaining_secs = 0.0
                 state.phase = GamePhase.FINISHED
-                move = Move(type=MoveType.FORFEIT, player_id=player_id, tiles=[], letters=[])
+                move = Move(type=MoveType.TIMEOUT, player_id=player_id, tiles=[], letters=[])
                 state.last_move = move
                 state.move_history.append(move)
                 await self._repo.save_game(state)
                 await self._broadcast(state)
                 game_manager.remove_game(code)
+
+    async def _end_by_timeout(self, state: GameState, code: str, viewer_id: str) -> GameStateOut:
+        """Ends the game when a player exhausts their second overtime bank mid-move."""
+        timed_out_id = state.players[state.current_player_index].id
+        state.phase = GamePhase.FINISHED
+        move = Move(type=MoveType.TIMEOUT, player_id=timed_out_id, tiles=[], letters=[])
+        state.last_move = move
+        state.move_history.append(move)
+        await self._repo.save_game(state)
+        await self._broadcast(state)
+        game_manager.remove_game(code)
+        return GameStateOut.from_domain(state, viewer_id=viewer_id)
 
     async def _broadcast(self, state: GameState) -> None:
         tokens = sse_manager.tokens_for_game(state.code)

@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
 const props = defineProps<{
   code: string
   hasPlacements: boolean
   hasSwaps: boolean
   swapMode: boolean
+  loading: boolean
 }>()
 
 const emit = defineEmits<{
@@ -16,11 +15,8 @@ const emit = defineEmits<{
   toggleSwap: []
 }>()
 
-const loading = ref(false)
-
-async function handleSubmit() {
+function handleSubmit() {
   if (!props.hasPlacements && !props.hasSwaps) return
-  loading.value = true
   emit('submit')
 }
 </script>

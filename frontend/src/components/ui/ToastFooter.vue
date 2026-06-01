@@ -21,7 +21,7 @@ const store = useGameStore()
           height: '6px',
           borderRadius: '50%',
           display: 'inline-block',
-          background: toast.type === 'error' ? 'var(--color-tertiary)' : toast.type === 'success' ? '#4caf50' : 'var(--color-outline)',
+          background: toast.type === 'error' ? 'var(--color-tertiary)' : toast.type === 'success' ? '#4caf50' : toast.type === 'warning' ? '#f59e0b' : 'var(--color-outline)',
         }"
       />
       <span style="font-family: var(--font-sans); font-size: 12px; color: var(--color-on-surface-variant); line-height: 1;">

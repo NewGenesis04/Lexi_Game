@@ -50,6 +50,7 @@ def _player_from_dict(d: dict) -> Player:
         rack=[_tile_from_dict(t) for t in d["rack"]],
         time_remaining_secs=d["time_remaining_secs"],
         score=d["score"],
+        overtime_count=d.get("overtime_count", 0),
     )
 
 

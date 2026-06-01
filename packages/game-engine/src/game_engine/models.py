@@ -16,6 +16,7 @@ class MoveType(str, Enum):
     SWAP = "swap"
     PASS = "pass"
     FORFEIT = "forfeit"
+    TIMEOUT = "timeout"
 
 
 class Dictionary(str, Enum):

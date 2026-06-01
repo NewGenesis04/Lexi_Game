@@ -5,7 +5,7 @@ import { PREMIUM_LAYOUT, PREMIUM_LABELS } from '../../constants/board'
 const props = defineProps<{
   board: (string | null)[][]
   ghostAt: (row: number, col: number) => { rackIndex: number; row: number; col: number } | undefined
-  blankLetterAt: (row: number, col: number) => string | undefined
+  ghostLetterAt: (row: number, col: number) => string | undefined
   hasSelection: boolean
 }>()
 
@@ -18,13 +18,25 @@ const emit = defineEmits<{
 const COL_LABELS = 'ABCDEFGHIJKLMNO'.split('')
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
+const TILE_POINTS: Record<string, number> = {
+  A: 1, B: 3, C: 3, D: 2, E: 1, F: 4, G: 2, H: 4, I: 1,
+  J: 8, K: 5, L: 1, M: 3, N: 1, O: 1, P: 3, Q: 10, R: 1,
+  S: 1, T: 1, U: 1, V: 4, W: 4, X: 8, Y: 4, Z: 10,
+}
+
+// Lowercase letters on the board are blanks played as that letter → 0 pts
+function boardTilePts(letter: string | null): number {
+  if (!letter) return 0
+  if (letter !== letter.toUpperCase()) return 0
+  return TILE_POINTS[letter] ?? 0
+}
+
 const pickerPos = ref<{ row: number; col: number } | null>(null)
 
 function handleCellClick(row: number, col: number) {
   const ghost = props.ghostAt(row, col)
   if (ghost) {
-    const cell = props.board[row]?.[col]
-    if (cell === ' ') {
+    if (props.ghostLetterAt(row, col) === undefined) {
       pickerPos.value = { row, col }
     } else {
       emit('removeGhost', row, col)
@@ -50,52 +62,56 @@ function premium(row: number, col: number) {
 <template>
   <div class="relative">
     <div class="board-container">
-      <table class="board-table">
-        <thead>
-          <tr>
-            <th class="h-5 w-6" />
-            <th v-for="(label, ci) in COL_LABELS" :key="ci" class="h-5 w-9 text-center label">
-              {{ label }}
-            </th>
-            <th class="h-5 w-6" />
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(row, ri) in board" :key="ri">
-            <td class="w-6 text-center label">{{ ri + 1 }}</td>
-            <td v-for="(_, ci) in row" :key="ci" class="p-[1px]">
-              <div
-                class="cell"
-                :class="{
-                  'cell--occupied': board[ri]?.[ci],
-                  'cell--ghost': ghostAt(ri, ci),
-                  'cell--hoverable': hasSelection && !board[ri]?.[ci] && !ghostAt(ri, ci),
-                  [`cell--${premium(ri, ci)}`]: !board[ri]?.[ci] && !ghostAt(ri, ci) && premium(ri, ci) !== 'normal',
-                }"
-                @click="handleCellClick(ri, ci)"
-              >
-                <span v-if="board[ri]?.[ci]" class="tile-letter">{{ board[ri][ci]!.toUpperCase() }}</span>
-                <template v-else-if="ghostAt(ri, ci)">
-                  <span class="ghost-letter">{{ blankLetterAt(ri, ci) ?? '?' }}</span>
-                </template>
-                <span v-else-if="premium(ri, ci) !== 'normal'" class="premium-label">
-                  {{ PREMIUM_LABELS[premium(ri, ci)] }}
-                </span>
-              </div>
-            </td>
-            <td class="w-6 text-center label">{{ ri + 1 }}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <th class="h-5 w-6" />
-            <th v-for="(label, ci) in COL_LABELS" :key="ci" class="h-5 w-9 text-center label">
-              {{ label }}
-            </th>
-            <th class="h-5 w-6" />
-          </tr>
-        </tfoot>
-      </table>
+
+      <div class="label-row">
+        <div class="label-spacer" />
+        <div v-for="(label, ci) in COL_LABELS" :key="ci" class="col-label">{{ label }}</div>
+        <div class="label-spacer" />
+      </div>
+
+      <div class="board-middle">
+        <div class="row-labels">
+          <div v-for="(_, ri) in board" :key="ri" class="row-label">{{ ri + 1 }}</div>
+        </div>
+
+        <div class="board-grid">
+          <template v-for="(row, ri) in board" :key="ri">
+            <div
+              v-for="(_, ci) in row"
+              :key="ci"
+              class="cell"
+              :class="{
+                'cell--occupied': board[ri]?.[ci],
+                'cell--ghost': ghostAt(ri, ci),
+                'cell--hoverable': hasSelection && !board[ri]?.[ci] && !ghostAt(ri, ci),
+                [`cell--${premium(ri, ci)}`]: !board[ri]?.[ci] && !ghostAt(ri, ci) && premium(ri, ci) !== 'normal',
+              }"
+              @click="handleCellClick(ri, ci)"
+            >
+              <template v-if="board[ri]?.[ci]">
+                <span class="tile-letter">{{ board[ri][ci]!.toUpperCase() }}</span>
+                <span class="tile-pts">{{ boardTilePts(board[ri][ci]) }}</span>
+              </template>
+              <template v-else-if="ghostAt(ri, ci)">
+                <span class="ghost-letter">{{ ghostLetterAt(ri, ci) ?? '?' }}</span>
+              </template>
+              <span v-else-if="premium(ri, ci) !== 'normal'" class="premium-label">
+                {{ PREMIUM_LABELS[premium(ri, ci)] }}
+              </span>
+            </div>
+          </template>
+        </div>
+
+        <div class="row-labels">
+          <div v-for="(_, ri) in board" :key="ri" class="row-label">{{ ri + 1 }}</div>
+        </div>
+      </div>
+
+      <div class="label-row">
+        <div class="label-spacer" />
+        <div v-for="(label, ci) in COL_LABELS" :key="ci" class="col-label">{{ label }}</div>
+        <div class="label-spacer" />
+      </div>
     </div>
 
     <div
@@ -113,9 +129,7 @@ function premium(row: number, col: number) {
           {{ letter }}
         </button>
       </div>
-      <button class="blank-picker__cancel" @click="pickerPos = null">
-        Cancel
-      </button>
+      <button class="blank-picker__cancel" @click="pickerPos = null">Cancel</button>
     </div>
   </div>
 </template>
@@ -130,17 +144,59 @@ function premium(row: number, col: number) {
   box-shadow: var(--shadow-board);
 }
 
-.board-table {
-  border-collapse: separate;
-  border-spacing: 1px;
+.label-row {
+  display: flex;
+  align-items: center;
+  height: 20px;
 }
 
-.label {
+.label-spacer {
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.col-label {
+  width: 34px;
+  text-align: center;
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--color-on-surface-variant);
+}
+
+.board-middle {
+  display: flex;
+  align-items: stretch;
+}
+
+.row-labels {
+  width: 24px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.row-label {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--color-on-surface-variant);
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(15, 34px);
+  grid-template-rows: repeat(15, 34px);
+  gap: 1px;
+  background-color: var(--color-outline-variant);
+  border-radius: var(--radius-board);
+  overflow: hidden;
 }
 
 .cell {
@@ -149,23 +205,22 @@ function premium(row: number, col: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-cell);
-  box-shadow: var(--shadow-cell-inset);
-  transition: all 0.15s;
   position: relative;
   cursor: default;
+  background: var(--color-surface-container-low);
+  transition: background 0.12s, box-shadow 0.12s;
 }
 
 .cell--hoverable {
   cursor: pointer;
 }
 .cell--hoverable:hover {
-  box-shadow: var(--shadow-cell-inset), 0 0 0 1px var(--color-outline);
+  background: var(--color-surface-container);
+  box-shadow: inset 0 0 0 1px var(--color-outline);
 }
 
 .cell--occupied {
   background: var(--color-placed-tile-bg);
-  border: 1px solid var(--color-outline);
   box-shadow: var(--shadow-cell-occupied);
 }
 
@@ -177,10 +232,20 @@ function premium(row: number, col: number) {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
+.tile-pts {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-family: var(--font-sans);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-placed-tile-points);
+}
+
 .cell--ghost {
   background: rgba(212, 197, 169, 0.35);
-  border: 2px solid var(--color-active-turn);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+  box-shadow: inset 0 0 0 2px var(--color-active-turn), 0 0 8px rgba(16, 185, 129, 0.3);
 }
 
 .ghost-letter {
@@ -190,11 +255,11 @@ function premium(row: number, col: number) {
   color: var(--color-active-turn);
 }
 
-.cell--dl  { background: var(--color-premium-dl-bg);  border: 1px solid var(--color-outline-variant); }
-.cell--tl  { background: var(--color-premium-tl-bg);  border: 1px solid var(--color-outline-variant); }
-.cell--dw  { background: var(--color-premium-dw-bg);  border: 1px solid var(--color-outline-variant); }
-.cell--tw  { background: var(--color-premium-tw-bg);  border: 1px solid var(--color-outline-variant); }
-.cell--center { background: var(--color-premium-center-bg); border: 1px solid var(--color-outline-variant); }
+.cell--dl     { background: var(--color-premium-dl-bg); }
+.cell--tl     { background: var(--color-premium-tl-bg); }
+.cell--dw     { background: var(--color-premium-dw-bg); }
+.cell--tw     { background: var(--color-premium-tw-bg); }
+.cell--center { background: var(--color-premium-center-bg); }
 
 .premium-label {
   font-family: var(--font-sans);
@@ -203,10 +268,10 @@ function premium(row: number, col: number) {
   letter-spacing: 0.1em;
 }
 
-.cell--dl  .premium-label { color: var(--color-premium-dl-label); }
-.cell--tl  .premium-label { color: var(--color-premium-tl-label); }
-.cell--dw  .premium-label { color: var(--color-premium-dw-label); }
-.cell--tw  .premium-label { color: var(--color-premium-tw-label); }
+.cell--dl     .premium-label { color: var(--color-premium-dl-label); }
+.cell--tl     .premium-label { color: var(--color-premium-tl-label); }
+.cell--dw     .premium-label { color: var(--color-premium-dw-label); }
+.cell--tw     .premium-label { color: var(--color-premium-tw-label); }
 .cell--center .premium-label { color: var(--color-premium-center-label); }
 
 .blank-picker {

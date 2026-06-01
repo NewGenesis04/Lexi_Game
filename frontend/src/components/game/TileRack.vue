@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, computed, watch } from 'vue'
 import type { TileOut } from '../../types/game'
 
 const props = defineProps<{
@@ -13,10 +14,29 @@ const emit = defineEmits<{
   selectTile: [index: number]
 }>()
 
-function tileStyle(i: number) {
-  const isSelected = props.selectedIndex === i
-  const isPlaced = props.placedIndices.has(i)
-  const isSwap = props.swapIndices.has(i)
+const shuffleOrder = ref<number[]>([])
+
+// Keyed on tile letters so the order only resets when your actual rack changes,
+// not when an unrelated SSE update delivers a new game object reference.
+const tileSignature = computed(() => props.tiles.map(t => t.letter).join(','))
+
+watch(tileSignature, () => {
+  shuffleOrder.value = props.tiles.map((_, i) => i)
+}, { immediate: true })
+
+function shuffle() {
+  const arr = [...shuffleOrder.value]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  shuffleOrder.value = arr
+}
+
+function tileStyle(originalIndex: number) {
+  const isSelected = props.selectedIndex === originalIndex
+  const isPlaced = props.placedIndices.has(originalIndex)
+  const isSwap = props.swapIndices.has(originalIndex)
   const swapActive = props.swapMode
 
   let bg: string
@@ -68,6 +88,7 @@ function tileStyle(i: number) {
     transform,
     color,
     opacity,
+    position: 'relative' as const,
     transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
     cursor: 'pointer',
     borderRadius: '0.25rem',
@@ -80,9 +101,9 @@ function tileStyle(i: number) {
   }
 }
 
-function tileHover(i: number, entering: boolean) {
-  if (props.selectedIndex === i || props.swapIndices.has(i) || props.placedIndices.has(i)) return
-  const el = document.querySelector<HTMLElement>(`[data-rack-index="${i}"]`)
+function tileHover(originalIndex: number, entering: boolean) {
+  if (props.selectedIndex === originalIndex || props.swapIndices.has(originalIndex) || props.placedIndices.has(originalIndex)) return
+  const el = document.querySelector<HTMLElement>(`[data-rack-index="${originalIndex}"]`)
   if (!el) return
   if (entering) {
     el.style.background = 'linear-gradient(180deg, var(--color-surface-container-highest), var(--color-surface-container-high))'
@@ -97,26 +118,36 @@ function tileHover(i: number, entering: boolean) {
 </script>
 
 <template>
-  <div
-    class="rack-container"
-    style="display: inline-flex; padding: 6px; gap: 6px;"
-  >
-    <button
-      v-for="(tile, i) in tiles"
-      :key="i"
-      :data-rack-index="i"
-      :style="tileStyle(i)"
-      @click="emit('selectTile', i)"
-      @mouseenter="tileHover(i, true)"
-      @mouseleave="tileHover(i, false)"
-    >
-      <span :style="{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, lineHeight: '1', color: tileStyle(i).color, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }">
-        {{ tile.letter === ' ' ? '?' : tile.letter }}
-      </span>
-    </button>
+  <div class="rack-container" style="display: inline-flex; padding: 6px; gap: 6px;">
+    <template v-if="tiles.length">
+      <button
+        v-for="originalIndex in shuffleOrder"
+        :key="originalIndex"
+        :data-rack-index="originalIndex"
+        :style="tileStyle(originalIndex)"
+        @click="emit('selectTile', originalIndex)"
+        @mouseenter="tileHover(originalIndex, true)"
+        @mouseleave="tileHover(originalIndex, false)"
+      >
+        <span :style="{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, lineHeight: '1', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }">
+          {{ tiles[originalIndex].letter === ' ' ? '?' : tiles[originalIndex].letter }}
+        </span>
+        <span class="tile-pts">{{ tiles[originalIndex].points }}</span>
+      </button>
+
+      <button class="shuffle-btn" title="Shuffle tiles" @click="shuffle">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 3 21 3 21 8"/>
+          <line x1="4" y1="20" x2="21" y2="3"/>
+          <polyline points="21 16 21 21 16 21"/>
+          <line x1="15" y1="15" x2="21" y2="21"/>
+          <line x1="4" y1="4" x2="9" y2="9"/>
+        </svg>
+      </button>
+    </template>
 
     <div
-      v-if="!tiles.length"
+      v-else
       class="flex items-center justify-center"
       style="width: 176px; height: 44px; font-family: var(--font-sans); font-size: 12px; color: var(--color-on-surface-variant);"
     >
@@ -131,5 +162,37 @@ function tileHover(i: number, entering: boolean) {
   border-radius: var(--radius-panel);
   border: 1px solid var(--color-outline-variant);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.tile-pts {
+  position: absolute;
+  bottom: 3px;
+  right: 4px;
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.75;
+}
+
+.shuffle-btn {
+  width: 36px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 0.25rem;
+  color: var(--color-on-surface-variant);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.shuffle-btn:hover {
+  background: var(--color-surface-container-high);
+  border-color: var(--color-outline);
+  color: var(--color-on-surface);
 }
 </style>

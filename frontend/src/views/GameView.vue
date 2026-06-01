@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '../stores/game'
 import { usePendingMove } from '../composables/usePendingMove'
@@ -32,8 +32,27 @@ const {
 } = usePendingMove()
 
 const code = route.params.code as string
+const submitting = ref(false)
 const myRack = computed(() => store.myPlayer?.rack ?? [])
 const myBoard = computed<(string | null)[][]>(() => store.game?.board ?? [])
+
+function ghostLetterAt(r: number, c: number): string | undefined {
+  const ghost = ghostAt(r, c)
+  if (!ghost) return undefined
+  const tile = myRack.value[ghost.rackIndex]
+  if (!tile) return undefined
+  if (tile.letter === ' ') return blankLetterMap.value.get(`${r},${c}`)
+  return tile.letter
+}
+
+async function copyCode() {
+  try {
+    await navigator.clipboard.writeText(code)
+    store.addToast(`Code copied: ${code}`, 'info')
+  } catch {
+    store.addToast('Failed to copy room code', 'error')
+  }
+}
 
 const placedIndices = computed(() => {
   const s = new Set<number>()
@@ -45,8 +64,20 @@ const placedIndices = computed(() => {
 
 const winner = computed(() => {
   if (!store.game || store.game.phase !== 'finished') return null
-  const sorted = [...store.game.players].sort((a, b) => b.score - a.score)
-  return sorted[0] ?? null
+  const last = store.game.last_move
+  if (last?.type === 'forfeit' || last?.type === 'timeout') {
+    return store.game.players.find(p => p.id !== last.player_id) ?? null
+  }
+  return [...store.game.players].sort((a, b) => b.score - a.score)[0] ?? null
+})
+
+const iAmWinner = computed(() => winner.value?.id === store.session?.player_id)
+
+const endReason = computed<'forfeit' | 'timeout' | 'normal'>(() => {
+  const t = store.game?.last_move?.type
+  if (t === 'forfeit') return 'forfeit'
+  if (t === 'timeout') return 'timeout'
+  return 'normal'
 })
 
 function handlePlaceTile(row: number, col: number) {
@@ -56,11 +87,14 @@ function handlePlaceTile(row: number, col: number) {
 async function handleSubmit() {
   const payload = buildMovePayload(myRack.value)
   if (!payload) return
+  submitting.value = true
   try {
     await store.submitMove(code, payload)
     clearAll()
   } catch (err) {
-    store.addToast(String(err), 'error')
+    store.addToast(err instanceof Error ? err.message : String(err), 'error')
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -68,7 +102,7 @@ async function handlePass() {
   try {
     await store.submitMove(code, { type: 'pass' })
   } catch (err) {
-    store.addToast(String(err), 'error')
+    store.addToast(err instanceof Error ? err.message : String(err), 'error')
   }
 }
 
@@ -76,11 +110,25 @@ async function handleForfeit() {
   try {
     await store.forfeit(code)
   } catch (err) {
-    store.addToast(String(err), 'error')
+    store.addToast(err instanceof Error ? err.message : String(err), 'error')
   }
 }
 
-function handleLeave() {
+async function handleLeave() {
+  if (store.phase === 'playing') {
+    try {
+      await store.forfeit(code)
+    } catch {
+      // game may already be over — proceed with cleanup regardless
+    }
+  }
+  reset()
+  store.disconnectSSE()
+  store.reset()
+  router.push('/')
+}
+
+function handlePlayAgain() {
   reset()
   store.disconnectSSE()
   store.reset()
@@ -94,9 +142,19 @@ function handleLeave() {
       class="flex items-center justify-between px-6 py-3"
       style="background: var(--color-surface-container-low); border-bottom: 1px solid var(--color-outline-variant);"
     >
-      <span style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-surface-variant);">
+      <button
+        style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-surface-variant); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 0.25rem; transition: background 0.15s;"
+        @mouseenter="(e: any) => { e.currentTarget.style.background = 'var(--color-surface-container)' }"
+        @mouseleave="(e: any) => { e.currentTarget.style.background = 'none' }"
+        @click="copyCode"
+        title="Copy room code"
+      >
         GAME · {{ code }}
-      </span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      </button>
       <div class="flex items-center gap-2">
         <button
           style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-primary); background: var(--color-tertiary-container); border: none; border-radius: 0.25rem; padding: 6px 12px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s;"
@@ -136,7 +194,7 @@ function handleLeave() {
         <GameBoard
           :board="myBoard"
           :ghost-at="ghostAt"
-          :blank-letter-at="(r, c) => blankLetterMap.get(`${r},${c}`)"
+          :ghost-letter-at="ghostLetterAt"
           :has-selection="selectedRackIndex !== null"
           @place-tile="handlePlaceTile"
           @remove-ghost="tryRemoveGhost"
@@ -156,6 +214,7 @@ function handleLeave() {
           :has-placements="hasPendingPlacements"
           :has-swaps="hasSwapSelection"
           :swap-mode="swapMode"
+          :loading="submitting"
           @submit="handleSubmit"
           @clear="clearAll"
           @toggle-swap="toggleSwapMode"
@@ -189,14 +248,36 @@ function handleLeave() {
           width: 100%;
         "
       >
-        <h2 style="font-family: var(--font-serif); font-size: 32px; font-weight: 600; color: var(--color-on-surface-variant); letter-spacing: -0.02em; margin-bottom: 24px;">
-          GAME OVER
-        </h2>
+        <div style="margin-bottom: 6px;">
+          <h2 :style="{
+            fontFamily: 'var(--font-serif)',
+            fontSize: '36px',
+            fontWeight: 600,
+            letterSpacing: '-0.02em',
+            lineHeight: '1.1',
+            color: endReason === 'timeout' ? '#f59e0b' : iAmWinner ? 'var(--color-primary)' : 'var(--color-tertiary)',
+          }">
+            {{ endReason === 'timeout' ? (iAmWinner ? 'YOU WON' : 'TIMED OUT') : (iAmWinner ? 'YOU WON' : 'YOU LOST') }}
+          </h2>
+          <p :style="{
+            fontFamily: 'var(--font-sans)',
+            fontSize: '11px',
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            marginTop: '4px',
+            color: endReason === 'timeout' ? '#f59e0b' : endReason === 'forfeit' ? 'var(--color-tertiary)' : 'var(--color-on-surface-variant)',
+          }">
+            {{ endReason === 'timeout' ? 'TIME OUT' : endReason === 'forfeit' ? 'FORFEITED' : 'GAME OVER' }}
+          </p>
+        </div>
 
-        <div v-if="winner" class="space-y-1">
-          <div style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-surface-variant);">Winner</div>
-          <div style="font-family: var(--font-serif); font-size: 28px; font-weight: 500; color: var(--color-primary);">{{ winner.nickname }}</div>
-          <div style="font-family: var(--font-sans); font-size: 36px; font-weight: 600; color: var(--color-on-surface);">{{ winner.score }}</div>
+        <div v-if="winner" style="margin-bottom: 4px;">
+          <div style="font-family: var(--font-sans); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: var(--color-on-surface-variant); margin-bottom: 2px;">
+            {{ iAmWinner ? 'YOUR SCORE' : 'WINNER' }}
+          </div>
+          <div style="font-family: var(--font-serif); font-size: 22px; font-weight: 500; color: var(--color-primary);">
+            {{ iAmWinner ? '' : winner.nickname + ' · ' }}{{ winner.score }} pts
+          </div>
         </div>
 
         <div v-if="store.game" class="space-y-2 mt-6">
@@ -237,7 +318,7 @@ function handleLeave() {
           "
           @mouseenter="(e: any) => { e.target.style.opacity = '0.85' }"
           @mouseleave="(e: any) => { e.target.style.opacity = '1' }"
-          @click="router.push('/')"
+          @click="handlePlayAgain"
         >
           Play Again
         </button>
