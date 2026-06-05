@@ -43,7 +43,10 @@ async def _event_generator(
     code = session.game_code
     token = session.token
 
-    await svc.connect_player(code, session.player_id)
+    try:
+        await svc.connect_player(code, session.player_id, token)
+    except Exception:
+        return
 
     state = await repo.load_game(code)
     if state is not None:
@@ -75,7 +78,10 @@ async def _event_generator(
                 yield f"data: {get_task.result()}\n\n"
     finally:
         sse_manager.unsubscribe(code, token)
-        await svc.disconnect_player(code, session.player_id)
+        try:
+            await svc.disconnect_player(code, session.player_id, token)
+        except Exception:
+            pass
 
 
 @router.get("/events")

@@ -80,7 +80,8 @@ def mock_side_effects():
 
 @pytest.fixture(autouse=True)
 def clear_game_manager():
-    game_manager._connected.clear()
+    game_manager._connections.clear()
+    game_manager._pending_disconnects.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +263,7 @@ async def test_connect_player_marks_connected(repo, svc):
     state = _state()
     await repo.save_game(state)
     assert game_manager.is_player_connected("ABCD12", "p1") is False
-    await svc.connect_player("ABCD12", "p1")
+    await svc.connect_player("ABCD12", "p1", "tok1")
     assert game_manager.is_player_connected("ABCD12", "p1") is True
     assert game_manager.is_player_connected("ABCD12", "p2") is False
     s = await repo.load_game("ABCD12")
@@ -276,8 +277,8 @@ async def test_connect_player_resumes_when_both_connected(repo, svc):
     state.paused_at = 1000.0
     state.players[0].time_remaining_secs = 90.0
     await repo.save_game(state)
-    game_manager.mark_connected("ABCD12", "p1")
-    await svc.connect_player("ABCD12", "p2")
+    game_manager.add_connection("ABCD12", "p1", "tok_p1")
+    await svc.connect_player("ABCD12", "p2", "tok2")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PLAYING
     assert game_manager.is_player_connected("ABCD12", "p1") is True
@@ -291,7 +292,7 @@ async def test_connect_player_stays_paused_if_other_offline(repo, svc):
     state = _state()
     state.phase = GamePhase.PAUSED
     await repo.save_game(state)
-    await svc.connect_player("ABCD12", "p1")
+    await svc.connect_player("ABCD12", "p1", "tok1")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PAUSED
     assert game_manager.is_player_connected("ABCD12", "p1") is True
@@ -302,7 +303,7 @@ async def test_connect_player_does_nothing_for_created(repo, svc):
     state = _state()
     state.phase = GamePhase.CREATED
     await repo.save_game(state)
-    await svc.connect_player("ABCD12", "p1")
+    await svc.connect_player("ABCD12", "p1", "tok1")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.CREATED
 
@@ -311,7 +312,7 @@ async def test_connect_player_does_nothing_for_finished(repo, svc):
     state = _state()
     state.phase = GamePhase.FINISHED
     await repo.save_game(state)
-    await svc.connect_player("ABCD12", "p1")
+    await svc.connect_player("ABCD12", "p1", "tok1")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED
 
@@ -319,13 +320,15 @@ async def test_connect_player_does_nothing_for_finished(repo, svc):
 async def test_disconnect_player_pauses_playing_game(repo, svc):
     state = _state()
     await repo.save_game(state)
-    game_manager.mark_connected("ABCD12", "p1")
-    game_manager.mark_connected("ABCD12", "p2")
+    game_manager.add_connection("ABCD12", "p1", "tok_p1")
+    game_manager.add_connection("ABCD12", "p2", "tok_p2")
     with (
         patch("backend_api.game_manager.get_elapsed", return_value=5.0),
         patch("backend_api.game_manager.set_pause_timer"),
     ):
-        await svc.disconnect_player("ABCD12", "p1")
+        await svc.disconnect_player("ABCD12", "p1", "tok_p1")
+        # Grace timer was scheduled; fire it manually to check the pause logic
+        await svc._pause_after_grace("ABCD12", "p1", grace_secs=0)
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PAUSED
     assert game_manager.is_player_connected("ABCD12", "p1") is False
@@ -339,7 +342,7 @@ async def test_disconnect_player_does_nothing_for_created(repo, svc):
     state = _state()
     state.phase = GamePhase.CREATED
     await repo.save_game(state)
-    await svc.disconnect_player("ABCD12", "p1")
+    await svc.disconnect_player("ABCD12", "p1", "tok1")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.CREATED
 
@@ -348,15 +351,30 @@ async def test_disconnect_player_does_nothing_for_finished(repo, svc):
     state = _state()
     state.phase = GamePhase.FINISHED
     await repo.save_game(state)
-    await svc.disconnect_player("ABCD12", "p1")
+    await svc.disconnect_player("ABCD12", "p1", "tok1")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED
+
+
+async def test_disconnect_player_does_not_pause_if_player_never_connected(repo, svc):
+    """Regression: SSE connect during CREATED phase never marks player connected.
+    When that SSE later disconnects, disconnect_player must NOT pause the game,
+    because the player wasn't actually playing."""
+    state = _state()  # phase = PLAYING, players = [p1, p2]
+    await repo.save_game(state)
+    # p1's SSE connected while game was CREATED — connect_player returned early,
+    # so p1 was never marked connected in game_manager.
+    # Now p1's SSE disconnects:
+    await svc.disconnect_player("ABCD12", "p1", "tok1")
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING  # must NOT be PAUSED
+    assert game_manager.is_player_connected("ABCD12", "p1") is False
 
 
 async def test_disconnect_player_unknown_player_is_noop(repo, svc):
     state = _state()
     await repo.save_game(state)
-    await svc.disconnect_player("ABCD12", "unknown")
+    await svc.disconnect_player("ABCD12", "unknown", "tok_unknown")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PLAYING
 
@@ -392,7 +410,7 @@ async def test_disconnect_grace_task_forfeit_when_one_player_connected(repo, svc
     state = _state()
     state.phase = GamePhase.PAUSED
     await repo.save_game(state)
-    game_manager.mark_connected("ABCD12", "p1")
+    game_manager.add_connection("ABCD12", "p1", "tok_p1")
     await svc._disconnect_grace_task("ABCD12", grace_secs=0.001)
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED

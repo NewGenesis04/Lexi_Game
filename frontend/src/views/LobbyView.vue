@@ -17,7 +17,6 @@ async function handleCreate() {
   loading.value = true
   try {
     const res = await store.createGame(nickname.value, timeLimit.value, dictionary.value)
-    store.connectSSEStream()
     router.push(`/game/${res.code}`)
   } catch (err) {
     store.addToast(String(err), 'error')
@@ -30,7 +29,6 @@ async function handleJoin() {
   loading.value = true
   try {
     await store.joinGame(joinCode.value, nickname.value)
-    store.connectSSEStream()
     router.push(`/game/${joinCode.value}`)
   } catch (err) {
     store.addToast(String(err), 'error')

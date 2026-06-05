@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from game_engine.models import GamePhase
+
+from backend_api import game_manager
 from backend_api.repositories.game_repo import GameRepo
 from backend_api.routes import events, games
 
@@ -26,20 +29,24 @@ _CORS_ORIGINS = [
 
 
 async def _gc_sweep(repo: GameRepo) -> None:
-    """Every 60 seconds, garbage-collect paused games older than 30 minutes."""
+    """Every 60 seconds, garbage-collect paused games older than 30 minutes.
+    Cleans up both repo records and game_manager runtime state."""
     while True:
         await asyncio.sleep(60.0)
         codes = await repo.active_codes()
         for code in codes:
-            state = await repo.load_game(code)
-            if state is None:
-                continue
-            if state.phase != "paused" or state.paused_at is None:
-                continue
-            elapsed = time.time() - state.paused_at
-            if elapsed >= 1800.0:  # 30 minutes
-                await repo.delete_game(code)
-                await repo.deregister_active(code)
+            async with game_manager.get_lock(code):
+                state = await repo.load_game(code)
+                if state is None:
+                    game_manager.remove_game(code)
+                    continue
+                if state.phase != GamePhase.PAUSED or state.paused_at is None:
+                    continue
+                elapsed = time.time() - state.paused_at
+                if elapsed >= 1800.0:  # 30 minutes
+                    game_manager.remove_game(code)
+                    await repo.delete_game(code)
+                    await repo.deregister_active(code)
 
 
 @asynccontextmanager

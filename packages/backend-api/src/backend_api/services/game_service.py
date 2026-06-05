@@ -247,16 +247,19 @@ class GameService:
     # Disconnect / Adjournment
     # -----------------------------------------------------------------------
 
-    async def connect_player(self, code: str, player_id: str) -> None:
-        """Mark a player as connected. If game was PAUSED and both are back, resume."""
+    async def connect_player(self, code: str, player_id: str, token: str = "") -> None:
+        """Register an SSE connection for a player. If game was PAUSED and both
+        are back, resume. Silently returns if the game doesn't exist."""
         async with game_manager.get_lock(code):
-            state = await self._load_or_404(code)
+            game_manager.add_connection(code, player_id, token)
+
+            state = await self._repo.load_game(code)
+            if state is None:
+                return
             if state.phase not in (GamePhase.PLAYING, GamePhase.PAUSED):
                 return
-
             if not any(p.id == player_id for p in state.players):
                 return
-            game_manager.mark_connected(code, player_id)
 
             if state.phase == GamePhase.PAUSED:
                 cmap = game_manager.get_connected(code)
@@ -271,25 +274,33 @@ class GameService:
 
             await self._repo.save_game(state)
 
-    async def disconnect_player(self, code: str, player_id: str) -> None:
-        """Mark a player as disconnected. Freeze clock and pause if game was live."""
+    async def disconnect_player(self, code: str, player_id: str, token: str = "") -> None:
+        """Remove one SSE connection for a player. If no connections remain,
+        schedule a short grace pause. If the player reconnects (new SSE) before
+        the grace timer fires, the pause is cancelled.
+        Does nothing if the player was never marked connected.
+        Silently returns if the game doesn't exist — safe to call from SSE generator."""
         async with game_manager.get_lock(code):
-            state = await self._load_or_404(code)
+            state = await self._repo.load_game(code)
+            if state is None:
+                return
             if state.phase not in (GamePhase.PLAYING, GamePhase.PAUSED):
                 return
-
             if not any(p.id == player_id for p in state.players):
                 return
-            game_manager.mark_disconnected(code, player_id)
+
+            was_last = game_manager.remove_connection(code, player_id, token)
+            if not was_last:
+                return  # player still has other active connections
 
             if state.phase == GamePhase.PLAYING:
-                self._pause_game(state)
-                await self._repo.save_game(state)
-                await self._broadcast(state)
+                task = asyncio.create_task(
+                    self._pause_after_grace(code, player_id)
+                )
+                game_manager.schedule_disconnect_check(code, player_id, task)
             elif state.phase == GamePhase.PAUSED:
                 await self._repo.save_game(state)
-
-            self._spawn_disconnect_grace_task(state)
+                self._spawn_disconnect_grace_task(state)
 
     def _pause_game(self, state: GameState) -> None:
         """Freeze the active turn clock and transition to PAUSED."""
@@ -322,7 +333,8 @@ class GameService:
         game_manager.set_pause_timer(state.code, task)
 
     async def _disconnect_grace_task(self, code: str, grace_secs: float = 300.0) -> None:
-        """5-minute grace period (configurable via grace_secs). After expiry, forfeit against the disconnected player."""
+        """5-minute grace period. After expiry, forfeit against the disconnected player.
+        Always cleans up runtime state (lock, timers, connected map) when PAUSED."""
         try:
             await asyncio.sleep(grace_secs)
         except asyncio.CancelledError:
@@ -330,9 +342,12 @@ class GameService:
 
         async with game_manager.get_lock(code):
             state = await self._repo.load_game(code)
-            if state is None or state.phase != GamePhase.PAUSED:
+            if state is None:
+                game_manager.remove_game(code)
                 return
             game_manager.cancel_pause_timer(code)
+            if state.phase != GamePhase.PAUSED:
+                return  # game was resumed or finished since timer started
 
             cmap = game_manager.get_connected(code)
             connected_ids = [pid for pid, c in cmap.items() if c]
@@ -347,7 +362,28 @@ class GameService:
                 state.paused_at = None
                 await self._repo.save_game(state)
                 await self._broadcast(state)
-                game_manager.remove_game(code)
+
+            game_manager.remove_game(code)
+
+    async def _pause_after_grace(self, code: str, player_id: str, grace_secs: float = 10.0) -> None:
+        """Wait grace_secs, then pause the game if the player is still gone.
+        Cancelled automatically by game_manager.cancel_disconnect_check when
+        connect_player re-marks the player."""
+        try:
+            await asyncio.sleep(grace_secs)
+        except asyncio.CancelledError:
+            return
+
+        async with game_manager.get_lock(code):
+            if game_manager.is_player_connected(code, player_id):
+                return  # reconnected during grace window
+            state = await self._repo.load_game(code)
+            if state is None or state.phase != GamePhase.PLAYING:
+                return
+            self._pause_game(state)
+            await self._repo.save_game(state)
+            await self._broadcast(state)
+            self._spawn_disconnect_grace_task(state)
 
     # -----------------------------------------------------------------------
     # Internal helpers

@@ -1,5 +1,3 @@
-const RECONNECT_DELAY_MS = 2000
-
 let instance: EventSource | null = null
 
 export type SSECallback = (data: unknown) => void
@@ -27,13 +25,9 @@ export function connectSSE(url: string, onMessage: SSECallback): SSEConnection {
   }
 
   es.onerror = () => {
-    es.close()
-    if (instance === es) {
-      instance = null
-    }
-    setTimeout(() => {
-      connectSSE(url, onMessage)
-    }, RECONNECT_DELAY_MS)
+    // The browser EventSource API handles reconnection automatically.
+    // Do NOT close+recreate here — that would trigger a false disconnect
+    // on the server, causing the game to pause mid-reconnect.
   }
 
   return {

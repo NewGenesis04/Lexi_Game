@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { PREMIUM_LAYOUT, PREMIUM_LABELS } from '../../constants/board'
 
 const props = defineProps<{
@@ -45,6 +45,12 @@ function handleCellClick(row: number, col: number) {
   }
   if (props.hasSelection && !props.board[row]?.[col]) {
     emit('placeTile', row, col)
+    // Auto-show blank picker if the placed tile is a blank (no letter yet)
+    nextTick(() => {
+      if (props.ghostAt(row, col) && props.ghostLetterAt(row, col) === undefined) {
+        pickerPos.value = { row, col }
+      }
+    })
   }
 }
 

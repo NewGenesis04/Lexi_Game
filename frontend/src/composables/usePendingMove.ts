@@ -22,13 +22,14 @@ export function usePendingMove() {
     for (const g of ghosts.value.values()) {
       const tile = rack[g.rackIndex]
       if (!tile) continue
-      const letter = tile.letter === ' '
-        ? (blankLetterMap.value.get(`${g.row},${g.col}`) ?? '?')
-        : tile.letter
-      const plays_as = tile.letter === ' '
-        ? blankLetterMap.value.get(`${g.row},${g.col}`) ?? null
-        : null
-      out.push({ row: g.row, col: g.col, letter, plays_as })
+      const isBlank = tile.letter === ' '
+      const chosen = isBlank ? (blankLetterMap.value.get(`${g.row},${g.col}`) ?? '?') : ''
+      out.push({
+        row: g.row,
+        col: g.col,
+        letter: isBlank ? ' ' : tile.letter,
+        plays_as: isBlank ? chosen : null,
+      })
     }
     return out
   }
