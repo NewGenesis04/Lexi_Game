@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import math
 import random
 import string
 import time
@@ -9,7 +11,7 @@ import uuid
 
 from fastapi import HTTPException
 
-import math
+logger = logging.getLogger(__name__)
 
 from game_engine import bag as bag_module, board as board_module, scoring
 from game_engine import dictionary as dict_module
@@ -36,7 +38,7 @@ class GameService:
     # -----------------------------------------------------------------------
 
     async def create_game(
-        self, nickname: str, dictionary: Dictionary, time_per_player_secs: float
+        self, nickname: str, dictionary: Dictionary, time_per_player_secs: float, avatar: str | None = None
     ) -> CreateGameOut:
         code = _generate_code()
         player_id = str(uuid.uuid4())
@@ -56,6 +58,7 @@ class GameService:
                     nickname=nickname,
                     rack=rack,
                     time_remaining_secs=time_per_player_secs,
+                    avatar=avatar,
                 )
             ],
         )
@@ -65,10 +68,11 @@ class GameService:
             token=token, player_id=player_id, game_code=code, nickname=nickname
         ))
         await self._repo.register_active(code)
+        logger.info(f"Game {code} created by {nickname} (dict={dictionary}, time={int(time_per_player_secs)}s)")
 
         return CreateGameOut(code=code, token=token, player_id=player_id)
 
-    async def join_game(self, code: str, nickname: str) -> JoinGameOut:
+    async def join_game(self, code: str, nickname: str, avatar: str | None = None) -> JoinGameOut:
         async with game_manager.get_lock(code):
             state = await self._load_or_404(code)
             if state.phase != GamePhase.CREATED:
@@ -87,6 +91,7 @@ class GameService:
                     nickname=nickname,
                     rack=rack,
                     time_remaining_secs=state.players[0].time_remaining_secs,
+                    avatar=avatar,
                 )
             )
             state.phase = GamePhase.PLAYING
@@ -96,6 +101,8 @@ class GameService:
                 token=token, player_id=player_id, game_code=code, nickname=nickname
             ))
             self._start_timer(state)
+            p1, p2 = state.players[0].nickname, state.players[1].nickname
+            logger.info(f"Game {code} started: {p1} vs {p2}")
 
             return JoinGameOut(
                 token=token,
@@ -118,7 +125,8 @@ class GameService:
                 raise HTTPException(status_code=422, detail="Invalid placement")
 
             new_board = board_module.apply_placement(state.board, placed)
-            for word in board_module.formed_words(new_board, placed):
+            formed = board_module.formed_words(new_board, placed)
+            for word in formed:
                 if not dict_module.is_valid_word(word, state.dictionary):
                     raise HTTPException(status_code=422, detail=f"{word} is not a valid word")
 
@@ -142,7 +150,7 @@ class GameService:
             drawn, state.bag = bag_module.draw_tiles(state.bag, len(placed))
             player.rack = remaining + drawn
 
-            move = Move(type=MoveType.PLACE, player_id=player_id, tiles=placed, letters=[])
+            move = Move(type=MoveType.PLACE, player_id=player_id, tiles=placed, letters=[], score_delta=points, words=formed)
             state.last_move = move
             state.move_history.append(move)
             state.consecutive_passes = 0
@@ -214,6 +222,9 @@ class GameService:
 
             if state.consecutive_passes >= 6:
                 state.phase = GamePhase.FINISHED
+                for p in state.players:
+                    p.score -= sum(t.points for t in p.rack)
+                logger.info(f"Game {code} ended by 6 consecutive passes")
                 await self._repo.save_game(state)
                 await self._broadcast(state)
                 game_manager.remove_game(code)
@@ -233,6 +244,8 @@ class GameService:
         async with game_manager.get_lock(code):
             game_manager.clear_turn_started(code)
             state = await self._load_or_404(code)
+            forfeiter = next((p.nickname for p in state.players if p.id == player_id), player_id)
+            logger.info(f"Game {code}: {forfeiter} forfeited")
             state.phase = GamePhase.FINISHED
             move = Move(type=MoveType.FORFEIT, player_id=player_id, tiles=[], letters=[])
             state.last_move = move
@@ -354,6 +367,7 @@ class GameService:
             if len(connected_ids) == 1:
                 winner_id = connected_ids[0]
                 loser = next(p for p in state.players if p.id != winner_id)
+                logger.info(f"Game {code}: {loser.nickname} forfeited by disconnection timeout")
                 state.phase = GamePhase.FINISHED
                 move = Move(type=MoveType.TIMEOUT, player_id=loser.id, tiles=[], letters=[])
                 state.last_move = move
@@ -427,14 +441,16 @@ class GameService:
             player.score += penalty
 
         state.phase = GamePhase.FINISHED
+        logger.info(f"Game {state.code} ended normally (bag empty)")
         return True
 
     def _deduct_time(self, state: GameState, code: str) -> bool:
         """
         Deducts elapsed time from the current player's bank.
-        - First overspend: applies −10 penalty, resets bank to 60 s, increments overtime_count.
-        - Second overspend: sets bank to 0 s and returns True (caller must end the game).
-        Returns True only when the second overtime fires and a forfeit is required.
+        - Each of the first 3 overspends: applies −10 penalty, resets bank to 60 s,
+          increments overtime_count (max −30 pts total across three overtime minutes).
+        - Fourth overspend: sets bank to 0 s and returns True (caller must end the game).
+        Returns True only when the forfeit threshold is reached.
         """
         elapsed = game_manager.get_elapsed(code)
         game_manager.clear_turn_started(code)
@@ -445,13 +461,15 @@ class GameService:
             player.time_remaining_secs = new_time
             return False
 
-        if player.overtime_count == 0:
+        if player.overtime_count < 3:
             player.score -= 10
-            player.overtime_count = 1
+            player.overtime_count += 1
             player.time_remaining_secs = 60.0
+            logger.warning(f"Game {code}: OT·{player.overtime_count} granted to {player.nickname} (-10 pts)")
             return False
 
-        # Second overspend — caller must end the game
+        # Three full overtime minutes exhausted — caller must end the game
+        logger.warning(f"Game {code}: {player.nickname} exhausted all OT — forfeiting")
         player.time_remaining_secs = 0.0
         return True
 
@@ -473,10 +491,11 @@ class GameService:
                 return
 
             player = state.players[state.current_player_index]
-            if player.overtime_count == 0:
+            if player.overtime_count < 3:
                 player.score -= 10
+                player.overtime_count += 1
                 player.time_remaining_secs = 60.0
-                player.overtime_count = 1
+                logger.warning(f"Game {code}: OT·{player.overtime_count} granted to {player.nickname} (-10 pts) via timer")
                 game_manager.set_turn_started(code)
                 await self._repo.save_game(state)
                 await self._broadcast(state)
@@ -485,6 +504,7 @@ class GameService:
                 )
                 game_manager.set_timer(code, task)
             else:
+                logger.warning(f"Game {code}: {player.nickname} timed out after 3 OT minutes")
                 player.time_remaining_secs = 0.0
                 state.phase = GamePhase.FINISHED
                 move = Move(type=MoveType.TIMEOUT, player_id=player_id, tiles=[], letters=[])

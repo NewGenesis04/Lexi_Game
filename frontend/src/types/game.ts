@@ -26,6 +26,8 @@ export interface MoveOut {
   player_id: string
   tiles: PlacedTileOut[]
   letters: string[]
+  score_delta: number
+  words: string[]
 }
 
 /* ── Player (PlayerOut) ──────────────────── */
@@ -37,6 +39,7 @@ export interface PlayerOut {
   overtime_count: number
   connected: boolean
   rack: TileOut[]  // empty list for opponent
+  avatar?: string
 }
 
 /* ── Game state (GameStateOut) ────────────── */
@@ -53,6 +56,7 @@ export interface GameStateOut {
   current_player_index: number
   consecutive_passes: number
   last_move: MoveOut | null
+  move_history: MoveOut[]
 }
 
 /* ── API request / response bodies ────────── */
@@ -60,6 +64,7 @@ export interface CreateGameRequest {
   nickname: string
   dictionary: Dictionary
   time_per_player_secs: number
+  avatar?: string
 }
 
 export interface CreateGameResponse {
@@ -70,6 +75,7 @@ export interface CreateGameResponse {
 
 export interface JoinGameRequest {
   nickname: string
+  avatar?: string
 }
 
 export interface JoinGameResponse {
@@ -99,6 +105,7 @@ export interface PlayerSession {
   token: string
   player_id: string
   nickname: string
+  avatar?: string
 }
 
 /* ── UI types ──────────────────────────────── */

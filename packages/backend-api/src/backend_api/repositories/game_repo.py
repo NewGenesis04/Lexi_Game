@@ -40,6 +40,8 @@ def _move_from_dict(d: dict | None) -> Move | None:
         player_id=d["player_id"],
         tiles=[_placed_tile_from_dict(t) for t in d["tiles"]],
         letters=d["letters"],
+        score_delta=d.get("score_delta", 0),
+        words=d.get("words", []),
     )
 
 
@@ -51,6 +53,7 @@ def _player_from_dict(d: dict) -> Player:
         time_remaining_secs=d["time_remaining_secs"],
         score=d["score"],
         overtime_count=d.get("overtime_count", 0),
+        avatar=d.get("avatar"),
     )
 
 

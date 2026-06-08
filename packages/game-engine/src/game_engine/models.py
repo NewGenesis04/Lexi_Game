@@ -44,6 +44,8 @@ class Move:
     player_id: str
     tiles: list[PlacedTile] = field(default_factory=list)  # PLACE
     letters: list[str] = field(default_factory=list)        # SWAP
+    score_delta: int = 0
+    words: list[str] = field(default_factory=list)          # all words formed; [0] is primary
 
 
 @dataclass
@@ -54,6 +56,7 @@ class Player:
     time_remaining_secs: float = 0.0
     score: int = 0
     overtime_count: int = 0
+    avatar: str | None = None
 
 
 Board = list[list[str | None]]  # 15×15; None = empty, str = letter placed

@@ -27,10 +27,12 @@ class CreateGameRequest(BaseModel):
     nickname: str
     dictionary: Dictionary
     time_per_player_secs: float
+    avatar: str | None = None
 
 
 class JoinGameRequest(BaseModel):
     nickname: str
+    avatar: str | None = None
 
 
 class PlaceTilesRequest(BaseModel):
@@ -81,7 +83,9 @@ class PlacedTileOut(BaseModel):
 
     @classmethod
     def from_domain(cls, tile: PlacedTile) -> PlacedTileOut:
-        return cls(row=tile.row, col=tile.col, letter=tile.letter)
+        # For blanks, show the letter they were played as, not the space
+        display = tile.plays_as if tile.letter == " " and tile.plays_as else tile.letter
+        return cls(row=tile.row, col=tile.col, letter=display)
 
 
 class MoveOut(BaseModel):
@@ -89,6 +93,8 @@ class MoveOut(BaseModel):
     player_id: str
     tiles: list[PlacedTileOut]
     letters: list[str]
+    score_delta: int = 0
+    words: list[str] = []
 
     @classmethod
     def from_domain(cls, move: Move) -> MoveOut:
@@ -97,6 +103,8 @@ class MoveOut(BaseModel):
             player_id=move.player_id,
             tiles=[PlacedTileOut.from_domain(t) for t in move.tiles],
             letters=move.letters,
+            score_delta=move.score_delta,
+            words=move.words,
         )
 
 
@@ -108,6 +116,7 @@ class PlayerOut(BaseModel):
     overtime_count: int
     connected: bool
     rack: list[TileOut]
+    avatar: str | None = None
 
     @classmethod
     def from_domain(cls, player: Player, *, is_self: bool, connected: bool = False) -> PlayerOut:
@@ -119,6 +128,7 @@ class PlayerOut(BaseModel):
             overtime_count=player.overtime_count,
             connected=connected,
             rack=[TileOut.from_domain(t) for t in player.rack] if is_self else [],
+            avatar=player.avatar,
         )
 
 
@@ -132,6 +142,7 @@ class GameStateOut(BaseModel):
     current_player_index: int
     consecutive_passes: int
     last_move: MoveOut | None
+    move_history: list[MoveOut] = []
 
     @classmethod
     def from_domain(cls, state: GameState, *, viewer_id: str, connected_map: dict[str, bool] | None = None) -> GameStateOut:
@@ -152,6 +163,7 @@ class GameStateOut(BaseModel):
             current_player_index=state.current_player_index,
             consecutive_passes=state.consecutive_passes,
             last_move=MoveOut.from_domain(state.last_move) if state.last_move else None,
+            move_history=[MoveOut.from_domain(m) for m in state.move_history],
         )
 
 

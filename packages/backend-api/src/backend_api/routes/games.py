@@ -37,7 +37,7 @@ async def create_game(
     body: CreateGameRequest,
     svc: GameService = Depends(get_service),
 ) -> CreateGameOut:
-    return await svc.create_game(body.nickname, body.dictionary, body.time_per_player_secs)
+    return await svc.create_game(body.nickname, body.dictionary, body.time_per_player_secs, body.avatar)
 
 
 @router.post("/{code}/join", response_model=JoinGameOut)
@@ -46,7 +46,7 @@ async def join_game(
     body: JoinGameRequest,
     svc: GameService = Depends(get_service),
 ) -> JoinGameOut:
-    return await svc.join_game(code, body.nickname)
+    return await svc.join_game(code, body.nickname, body.avatar)
 
 
 @router.get("/{code}", response_model=GameStateOut)

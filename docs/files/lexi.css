@@ -1,0 +1,527 @@
+/*
+ * LEXI — Neo-Brutalist Design System
+ * ====================================
+ * Single source of truth for all design tokens.
+ *
+ * USAGE:
+ *   Import this file once in your main.css / App.vue:
+ *   @import './lexi.css';
+ *
+ *   All tokens are CSS custom properties consumed by
+ *   tailwind.config.js. Use them directly in component
+ *   styles as var(--token-name) wherever Tailwind utilities
+ *   aren't enough.
+ *
+ * STRUCTURE:
+ *   1. Palette primitives (raw colour values, not semantic)
+ *   2. Light mode semantic tokens  [data-theme="light"] / :root default
+ *   3. Dark mode semantic tokens   [data-theme="dark"]
+ *   4. Invariant tokens (same in both modes: borders, shadows, typography)
+ *   5. Board-specific tokens
+ *   6. Animation keyframes
+ */
+
+/* ============================================================
+   1. PALETTE PRIMITIVES
+   Colour ramps — these are never used directly in components.
+   Reference them only inside the semantic token blocks below.
+   ============================================================ */
+:root {
+  /* Cream / Paper */
+  --prim-cream-50:  #FAF7F0;
+  --prim-cream-100: #F5F0E4;
+  --prim-cream-200: #EDE4D0;
+  --prim-cream-900: #1A1209;
+
+  /* Black / Ink */
+  --prim-ink-900:   #0F0F0F;
+  --prim-ink-800:   #1A1A1A;
+  --prim-ink-700:   #252525;
+  --prim-ink-600:   #333333;
+  --prim-ink-500:   #555555;
+  --prim-ink-400:   #777777;
+  --prim-ink-300:   #AAAAAA;
+  --prim-ink-200:   #CCCCCC;
+  --prim-ink-100:   #E5E5E5;
+  --prim-ink-50:    #F2F2F2;
+
+  /* Acid Yellow — primary brand, light mode pop */
+  --prim-yellow-600: #D4A017;
+  --prim-yellow-500: #EDB825;
+  --prim-yellow-400: #F5CC42;
+  --prim-yellow-300: #FAE080;
+  --prim-yellow-200: #FDF0B8;
+  --prim-yellow-100: #FEFADF;
+
+  /* Cobalt Blue — DL squares + info */
+  --prim-cobalt-700: #1A3A6E;
+  --prim-cobalt-600: #1F4A9C;
+  --prim-cobalt-500: #2D64D4;
+  --prim-cobalt-400: #5A8FE8;
+  --prim-cobalt-300: #90B8F4;
+  --prim-cobalt-200: #C2D9FA;
+  --prim-cobalt-100: #E6F0FD;
+
+  /* Brick Red — TW squares + destructive */
+  --prim-brick-700: #7A1A0A;
+  --prim-brick-600: #A82010;
+  --prim-brick-500: #D42B14;
+  --prim-brick-400: #E85A44;
+  --prim-brick-300: #F49080;
+  --prim-brick-200: #FAC4BC;
+  --prim-brick-100: #FDE8E4;
+
+  /* Forest Green — DW squares + success */
+  --prim-forest-700: #0D3D1A;
+  --prim-forest-600: #145C28;
+  --prim-forest-500: #1F8040;
+  --prim-forest-400: #3CAF64;
+  --prim-forest-300: #78D49A;
+  --prim-forest-200: #B8EDD0;
+  --prim-forest-100: #E2F8EC;
+
+  /* Terracotta — TL squares + warning/accent */
+  --prim-terra-700: #6B2A10;
+  --prim-terra-600: #9A3D18;
+  --prim-terra-500: #C85520;
+  --prim-terra-400: #E07848;
+  --prim-terra-300: #F0A880;
+  --prim-terra-200: #F8CEB8;
+  --prim-terra-100: #FDF0E8;
+
+  /* Muted Slate — dark mode accent series */
+  --prim-slate-700: #1C2535;
+  --prim-slate-600: #2A3850;
+  --prim-slate-500: #3C5070;
+  --prim-slate-400: #5A7294;
+  --prim-slate-300: #8AA4C0;
+  --prim-slate-200: #B8CCE0;
+  --prim-slate-100: #DDE8F2;
+
+  /* Dusty Olive — dark mode primary accent */
+  --prim-olive-700: #1E2410;
+  --prim-olive-600: #2E3818;
+  --prim-olive-500: #485A28;
+  --prim-olive-400: #687A40;
+  --prim-olive-300: #94A86A;
+  --prim-olive-200: #C0D098;
+  --prim-olive-100: #E4EDD4;
+
+  /* Muted Terracotta — dark mode secondary */
+  --prim-mterra-700: #2A1810;
+  --prim-mterra-600: #402818;
+  --prim-mterra-500: #5C3C28;
+  --prim-mterra-400: #806050;
+  --prim-mterra-300: #A88C80;
+  --prim-mterra-200: #CEB8B0;
+  --prim-mterra-100: #EDE0DC;
+}
+
+
+/* ============================================================
+   2. LIGHT MODE TOKENS (default / [data-theme="light"])
+   Fairly colourful, high-contrast, papery base.
+   ============================================================ */
+:root,
+[data-theme="light"] {
+
+  /* --- Surfaces --- */
+  --color-bg:                var(--prim-cream-100);   /* Page background */
+  --color-bg-elevated:       var(--prim-cream-50);    /* Cards, modals */
+  --color-bg-sunken:         var(--prim-cream-200);   /* Inset areas (rack, board bg) */
+  --color-bg-overlay:        rgba(250, 247, 240, 0.92);
+
+  /* --- Text --- */
+  --color-text-primary:      var(--prim-ink-900);
+  --color-text-secondary:    var(--prim-ink-600);
+  --color-text-muted:        var(--prim-ink-400);
+  --color-text-on-accent:    var(--prim-ink-900);     /* Text sitting on yellow */
+  --color-text-on-dark:      var(--prim-cream-50);
+
+  /* --- Brand / Primary (Acid Yellow) --- */
+  --color-primary:           var(--prim-yellow-400);
+  --color-primary-hover:     var(--prim-yellow-500);
+  --color-primary-active:    var(--prim-yellow-600);
+  --color-primary-subtle:    var(--prim-yellow-100);
+
+  /* --- Secondary (Cobalt) --- */
+  --color-secondary:         var(--prim-cobalt-500);
+  --color-secondary-hover:   var(--prim-cobalt-600);
+  --color-secondary-subtle:  var(--prim-cobalt-100);
+  --color-text-on-secondary: var(--prim-cream-50);
+
+  /* --- Danger (Brick Red) --- */
+  --color-danger:            var(--prim-brick-500);
+  --color-danger-hover:      var(--prim-brick-600);
+  --color-danger-subtle:     var(--prim-brick-100);
+  --color-text-on-danger:    var(--prim-cream-50);
+
+  /* --- Success (Forest Green) --- */
+  --color-success:           var(--prim-forest-500);
+  --color-success-subtle:    var(--prim-forest-100);
+  --color-text-on-success:   var(--prim-cream-50);
+
+  /* --- Warning (Terracotta) --- */
+  --color-warning:           var(--prim-terra-500);
+  --color-warning-subtle:    var(--prim-terra-100);
+  --color-text-on-warning:   var(--prim-cream-50);
+
+  /* --- Borders --- */
+  --color-border:            var(--prim-ink-900);     /* Default border: always black in light */
+  --color-border-subtle:     var(--prim-ink-600);
+  --color-border-muted:      var(--prim-ink-300);
+
+  /* --- Tile colours --- */
+  --color-tile-bg:           var(--prim-cream-50);
+  --color-tile-border:       var(--prim-ink-900);
+  --color-tile-text:         var(--prim-ink-900);
+  --color-tile-points:       var(--prim-ink-500);
+  --color-tile-selected-bg:  var(--prim-yellow-400);
+  --color-tile-selected-border: var(--prim-ink-900);
+  --color-tile-selected-text: var(--prim-ink-900);
+  --color-tile-rack-bg:      var(--prim-cream-200);
+
+  /* --- Player panel --- */
+  --color-panel-bg:          var(--prim-cream-50);
+  --color-panel-border:      var(--prim-ink-900);
+  --color-panel-active-accent: var(--prim-yellow-400); /* Active turn top border */
+  --color-panel-score:       var(--prim-ink-900);
+  --color-panel-clock-urgent: var(--prim-brick-500);
+
+  /* --- Connection states --- */
+  --color-dot-active:        var(--prim-forest-500);
+  --color-dot-waiting:       var(--prim-forest-400);
+  --color-dot-offline:       var(--prim-ink-300);
+
+  /* --- Header --- */
+  --color-header-bg:         var(--prim-cream-50);
+  --color-header-border:     var(--prim-ink-900);
+
+  /* --- Notification bar --- */
+  --color-notif-bg:          var(--prim-ink-900);
+  --color-notif-text:        var(--prim-cream-50);
+  --color-notif-border:      var(--prim-ink-900);
+
+  /* --- Game over overlay --- */
+  --color-overlay-bg:        rgba(15, 15, 15, 0.85);
+  --color-overlay-card-bg:   var(--prim-cream-100);
+  --color-overlay-card-border: var(--prim-ink-900);
+}
+
+
+/* ============================================================
+   3. DARK MODE TOKENS ([data-theme="dark"])
+   Muted, desaturated. Same brutalist structure, quieter palette.
+   ============================================================ */
+[data-theme="dark"] {
+
+  /* --- Surfaces --- */
+  --color-bg:                var(--prim-ink-800);
+  --color-bg-elevated:       var(--prim-ink-700);
+  --color-bg-sunken:         var(--prim-ink-900);
+  --color-bg-overlay:        rgba(26, 26, 26, 0.94);
+
+  /* --- Text --- */
+  --color-text-primary:      var(--prim-ink-100);
+  --color-text-secondary:    var(--prim-ink-300);
+  --color-text-muted:        var(--prim-ink-400);
+  --color-text-on-accent:    var(--prim-ink-900);
+  --color-text-on-dark:      var(--prim-ink-100);
+
+  /* --- Brand / Primary (Dusty Olive) --- */
+  --color-primary:           var(--prim-olive-400);
+  --color-primary-hover:     var(--prim-olive-300);
+  --color-primary-active:    var(--prim-olive-500);
+  --color-primary-subtle:    var(--prim-olive-700);
+
+  /* --- Secondary (Muted Slate) --- */
+  --color-secondary:         var(--prim-slate-400);
+  --color-secondary-hover:   var(--prim-slate-300);
+  --color-secondary-subtle:  var(--prim-slate-700);
+  --color-text-on-secondary: var(--prim-ink-100);
+
+  /* --- Danger (muted brick) --- */
+  --color-danger:            var(--prim-brick-400);
+  --color-danger-hover:      var(--prim-brick-300);
+  --color-danger-subtle:     var(--prim-brick-700);
+  --color-text-on-danger:    var(--prim-ink-100);
+
+  /* --- Success --- */
+  --color-success:           var(--prim-forest-400);
+  --color-success-subtle:    var(--prim-forest-700);
+  --color-text-on-success:   var(--prim-ink-100);
+
+  /* --- Warning --- */
+  --color-warning:           var(--prim-mterra-300);
+  --color-warning-subtle:    var(--prim-mterra-700);
+  --color-text-on-warning:   var(--prim-ink-100);
+
+  /* --- Borders: white in dark mode --- */
+  --color-border:            var(--prim-ink-100);
+  --color-border-subtle:     var(--prim-ink-300);
+  --color-border-muted:      var(--prim-ink-600);
+
+  /* --- Tile colours --- */
+  --color-tile-bg:           var(--prim-ink-700);
+  --color-tile-border:       var(--prim-ink-100);
+  --color-tile-text:         var(--prim-ink-100);
+  --color-tile-points:       var(--prim-ink-300);
+  --color-tile-selected-bg:  var(--prim-olive-400);
+  --color-tile-selected-border: var(--prim-ink-100);
+  --color-tile-selected-text: var(--prim-ink-900);
+  --color-tile-rack-bg:      var(--prim-ink-900);
+
+  /* --- Player panel --- */
+  --color-panel-bg:          var(--prim-ink-700);
+  --color-panel-border:      var(--prim-ink-100);
+  --color-panel-active-accent: var(--prim-olive-400);
+  --color-panel-score:       var(--prim-ink-100);
+  --color-panel-clock-urgent: var(--prim-brick-400);
+
+  /* --- Connection states --- */
+  --color-dot-active:        var(--prim-forest-400);
+  --color-dot-waiting:       var(--prim-forest-300);
+  --color-dot-offline:       var(--prim-ink-500);
+
+  /* --- Header --- */
+  --color-header-bg:         var(--prim-ink-700);
+  --color-header-border:     var(--prim-ink-100);
+
+  /* --- Notification bar --- */
+  --color-notif-bg:          var(--prim-ink-700);
+  --color-notif-text:        var(--prim-ink-100);
+  --color-notif-border:      var(--prim-ink-100);
+
+  /* --- Game over overlay --- */
+  --color-overlay-bg:        rgba(10, 10, 10, 0.90);
+  --color-overlay-card-bg:   var(--prim-ink-700);
+  --color-overlay-card-border: var(--prim-ink-100);
+}
+
+
+/* ============================================================
+   4. INVARIANT TOKENS (same in both modes)
+   The neo-brutalist signature. These never change.
+   ============================================================ */
+:root {
+
+  /* --- Border widths --- */
+  --border-width-default: 2px;    /* Standard component borders */
+  --border-width-heavy:   3px;    /* Active/focus states, board container */
+  --border-width-light:   1px;    /* Internal dividers */
+
+  /* --- Neo-brutalist hard shadows ---
+       The key signature: no blur, pure offset.
+       Components sit on the page as physical objects.   */
+  --shadow-sm:   3px 3px 0px var(--color-border);   /* Buttons, small tiles */
+  --shadow-md:   4px 4px 0px var(--color-border);   /* Cards, panels */
+  --shadow-lg:   6px 6px 0px var(--color-border);   /* Board container, modals */
+  --shadow-none: 0px 0px 0px transparent;
+
+  /* Pressed state: shadow collapses + translate matches */
+  --shadow-pressed: 1px 1px 0px var(--color-border);
+  --translate-pressed: translate(2px, 2px);         /* Apply on :active */
+  --translate-hover:  translate(-1px, -1px);        /* Subtle lift on hover */
+
+  /* --- Tile hover: neo-brutalist rack feel ---
+       Tiles lift with a translate + shadow expand, not a blurred glow */
+  --tile-hover-translate: translate(-2px, -4px);
+  --tile-hover-shadow:    6px 8px 0px var(--color-border);
+  --tile-selected-translate: translate(-2px, -6px);
+  --tile-selected-shadow:    6px 10px 0px var(--color-border);
+
+  /* --- Border radius: minimal by design --- */
+  --radius-none:  0px;
+  --radius-xs:    2px;    /* Tiles, board cells */
+  --radius-sm:    4px;    /* Buttons, inputs, badges */
+  --radius-md:    0px;    /* Cards: brutalist — no radius */
+  --radius-lg:    0px;    /* Board container: no radius */
+
+  /* --- Typography --- */
+  --font-display:  'EB Garamond', Georgia, serif;   /* Board letters, titles */
+  --font-ui:       'Space Mono', 'Courier New', monospace; /* Labels, buttons, scores */
+  --font-numeric:  'Space Mono', monospace;          /* Clocks, scores */
+
+  /* --- Font sizes --- */
+  --text-xs:   10px;
+  --text-sm:   12px;
+  --text-base: 14px;
+  --text-md:   16px;
+  --text-lg:   18px;
+  --text-xl:   24px;
+  --text-2xl:  32px;
+  --text-3xl:  48px;
+
+  /* --- Letter spacing --- */
+  --tracking-ui:    0.08em;   /* All UI labels — Space Mono needs breathing room */
+  --tracking-tight: -0.02em;  /* Large numerics */
+  --tracking-wide:  0.12em;   /* Badge / category labels */
+
+  /* --- Spacing scale --- */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* --- Transitions --- */
+  --transition-fast:   100ms ease;
+  --transition-base:   150ms ease;
+  --transition-spring: 200ms cubic-bezier(0.34, 1.20, 0.64, 1); /* Tile hover */
+}
+
+
+/* ============================================================
+   5. BOARD-SPECIFIC TOKENS
+   Premium square colours. Neo-brutalist approach:
+   flat fills, no gradients, heavy label contrast.
+   Board border is always --color-border (mode-aware).
+   ============================================================ */
+:root,
+[data-theme="light"] {
+
+  /* Board container */
+  --color-board-bg:         var(--prim-cream-200);
+  --color-board-border:     var(--prim-ink-900);
+  --color-cell-empty-bg:    var(--prim-cream-100);
+  --color-cell-empty-border: var(--prim-ink-300);
+  --color-cell-placed-border: var(--prim-ink-900);
+
+  /* DL — Double Letter (Cobalt) */
+  --color-sq-dl-bg:         var(--prim-cobalt-200);
+  --color-sq-dl-label:      var(--prim-cobalt-700);
+  --color-sq-dl-border:     var(--prim-cobalt-600);
+
+  /* TL — Triple Letter (Terracotta) */
+  --color-sq-tl-bg:         var(--prim-terra-200);
+  --color-sq-tl-label:      var(--prim-terra-700);
+  --color-sq-tl-border:     var(--prim-terra-600);
+
+  /* DW — Double Word (Forest Green) */
+  --color-sq-dw-bg:         var(--prim-forest-200);
+  --color-sq-dw-label:      var(--prim-forest-700);
+  --color-sq-dw-border:     var(--prim-forest-600);
+
+  /* TW — Triple Word (Brick Red) */
+  --color-sq-tw-bg:         var(--prim-brick-200);
+  --color-sq-tw-label:      var(--prim-brick-700);
+  --color-sq-tw-border:     var(--prim-brick-600);
+
+  /* Star / Centre (Acid Yellow) */
+  --color-sq-star-bg:       var(--prim-yellow-300);
+  --color-sq-star-label:    var(--prim-ink-900);
+  --color-sq-star-border:   var(--prim-ink-900);
+
+  /* Placed tile */
+  --color-tile-placed-bg:   var(--prim-cream-50);
+  --color-tile-placed-text: var(--prim-ink-900);
+  --color-tile-placed-points: var(--prim-ink-500);
+  --color-tile-placed-border: var(--prim-ink-900);
+}
+
+[data-theme="dark"] {
+
+  /* Board container */
+  --color-board-bg:         var(--prim-ink-900);
+  --color-board-border:     var(--prim-ink-100);
+  --color-cell-empty-bg:    var(--prim-ink-800);
+  --color-cell-empty-border: var(--prim-ink-600);
+  --color-cell-placed-border: var(--prim-ink-100);
+
+  /* DL — Double Letter (muted slate) */
+  --color-sq-dl-bg:         var(--prim-slate-700);
+  --color-sq-dl-label:      var(--prim-slate-200);
+  --color-sq-dl-border:     var(--prim-slate-500);
+
+  /* TL — Triple Letter (muted terracotta) */
+  --color-sq-tl-bg:         var(--prim-mterra-700);
+  --color-sq-tl-label:      var(--prim-mterra-200);
+  --color-sq-tl-border:     var(--prim-mterra-500);
+
+  /* DW — Double Word (muted forest) */
+  --color-sq-dw-bg:         var(--prim-forest-700);
+  --color-sq-dw-label:      var(--prim-forest-200);
+  --color-sq-dw-border:     var(--prim-forest-500);
+
+  /* TW — Triple Word (muted brick) */
+  --color-sq-tw-bg:         var(--prim-brick-700);
+  --color-sq-tw-label:      var(--prim-brick-300);
+  --color-sq-tw-border:     var(--prim-brick-500);
+
+  /* Star / Centre (dusty olive) */
+  --color-sq-star-bg:       var(--prim-olive-600);
+  --color-sq-star-label:    var(--prim-olive-100);
+  --color-sq-star-border:   var(--prim-ink-100);
+
+  /* Placed tile */
+  --color-tile-placed-bg:   var(--prim-ink-600);
+  --color-tile-placed-text: var(--prim-ink-100);
+  --color-tile-placed-points: var(--prim-ink-300);
+  --color-tile-placed-border: var(--prim-ink-100);
+}
+
+
+/* ============================================================
+   6. ANIMATION KEYFRAMES
+   ============================================================ */
+@keyframes lexi-slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes lexi-fade-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes lexi-pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+@keyframes lexi-tile-place {
+  0%   { transform: scale(1.15) translateY(-4px); }
+  60%  { transform: scale(0.97) translateY(1px); }
+  100% { transform: scale(1)    translateY(0); }
+}
+
+/* Utility animation classes */
+.lexi-slide-up   { animation: lexi-slide-up  250ms ease forwards; }
+.lexi-fade-in    { animation: lexi-fade-in   350ms ease forwards; }
+.lexi-pulse-dot  { animation: lexi-pulse-dot 2s ease-in-out infinite; }
+.lexi-tile-place { animation: lexi-tile-place 180ms cubic-bezier(0.34, 1.20, 0.64, 1) forwards; }
+
+
+/* ============================================================
+   BASE RESETS (neo-brutalist defaults applied globally)
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  letter-spacing: var(--tracking-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Lexi display text (board letters, headings) */
+.lexi-display {
+  font-family: var(--font-display);
+  letter-spacing: normal;
+}
+
+/* Lexi numeric (clocks, scores) */
+.lexi-numeric {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
+}

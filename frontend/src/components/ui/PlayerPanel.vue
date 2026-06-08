@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue'
 import type { PlayerOut } from '../../types/game'
+import { AVATARS } from '../../constants/avatars'
 
 const props = defineProps<{
   player: PlayerOut | null
   position: 'top' | 'bottom'
   isActiveTurn: boolean
   connected: boolean
+  avatarKey?: string
 }>()
+
+const avatarSrc = computed(() => {
+  const key = props.avatarKey ?? props.player?.avatar
+  return key ? (AVATARS[key] ?? null) : null
+})
 
 const displaySeconds = ref(0)
 let serverBase = 0
@@ -15,17 +22,13 @@ let baseTimestamp = 0
 let ticker: ReturnType<typeof setInterval> | null = null
 
 function stopTicker() {
-  if (ticker !== null) {
-    clearInterval(ticker)
-    ticker = null
-  }
+  if (ticker !== null) { clearInterval(ticker); ticker = null }
 }
 
 function startTicker() {
   stopTicker()
   ticker = setInterval(() => {
-    const elapsed = (Date.now() - baseTimestamp) / 1000
-    displaySeconds.value = Math.max(0, Math.ceil(serverBase - elapsed))
+    displaySeconds.value = Math.max(0, Math.ceil(serverBase - (Date.now() - baseTimestamp) / 1000))
   }, 1000)
 }
 
@@ -55,83 +58,95 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-const dotState = computed(() => {
-  if (!props.player) return { background: '#6b7280', boxShadow: 'none', animation: 'none' }
+const dotStyle = computed(() => {
+  if (!props.player) return { background: 'var(--color-dot-offline)' }
   if (props.isActiveTurn && props.connected) {
-    return {
-      background: '#10b981',
-      boxShadow: '0 0 6px rgba(16,185,129,0.5)',
-      animation: 'none',
-    }
+    return { background: 'var(--color-dot-active)', boxShadow: '0 0 6px var(--color-dot-active)' }
   }
   if (props.connected) {
-    return {
-      background: '#34d399',
-      boxShadow: '0 0 6px rgba(16,185,129,0.5)',
-      animation: 'pulse 2s ease-in-out infinite',
-    }
+    return { background: 'var(--color-dot-waiting)', animation: 'lexi-pulse-dot 2s ease-in-out infinite' }
   }
-  return { background: '#6b7280', boxShadow: 'none', animation: 'none' }
+  return { background: 'var(--color-dot-offline)' }
+})
+
+const isOvertime = computed(() => (props.player?.overtime_count ?? 0) > 0)
+const isClockUrgent = computed(() => isOvertime.value || displaySeconds.value < 60)
+
+const cardStyle = computed(() => {
+  if (props.isActiveTurn && props.connected) {
+    return { borderTopColor: 'var(--color-panel-active-accent)' }
+  }
+  return {}
 })
 </script>
 
 <template>
   <div
-    class="w-44 flex-shrink-0"
-    :style="{ opacity: connected !== false ? 1 : 0.5, transition: 'opacity 0.3s' }"
+    class="w-44 flex-shrink-0 transition-opacity duration-300"
+    :class="connected !== false ? 'opacity-100' : 'opacity-50'"
   >
     <div
-      :style="{
-        background: 'rgba(38,38,38,0.4)',
-        borderRadius: 'var(--radius-panel)',
-        border: '1px solid rgba(96,96,96,0.3)',
-        borderTop: isActiveTurn && connected ? '2px solid #10b981' : '1px solid rgba(96,96,96,0.3)',
-        padding: '14px',
-      }"
+      class="panel-card p-3.5 transition-all duration-lexi-base"
+      :class="isActiveTurn && connected ? 'border-t-4 shadow-lexi-md' : 'shadow-lexi-sm'"
+      :style="cardStyle"
     >
-      <div class="flex items-center gap-2">
+      <!-- Avatar -->
+      <div v-if="avatarSrc" class="relative mb-3 flex justify-center">
+        <div class="relative" style="width: 56px; height: 56px;">
+          <img
+            :src="avatarSrc"
+            alt="avatar"
+            class="w-14 h-14 object-cover"
+          />
+          <span
+            class="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full"
+            style="border: 2px solid var(--color-panel-bg);"
+            :style="dotStyle"
+          />
+        </div>
+      </div>
+
+      <!-- Name row -->
+      <div class="flex items-center gap-2 min-w-0">
         <span
-          :style="{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            display: 'inline-block',
-            background: dotState.background,
-            boxShadow: dotState.boxShadow,
-            animation: dotState.animation,
-          }"
+          v-if="!avatarSrc"
+          class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+          :style="dotStyle"
         />
-        <span
-          v-if="player"
-          :style="{ fontFamily: 'var(--font-panel)', fontSize: '14px', fontWeight: 700, color: '#e5e5e5', letterSpacing: '-0.02em', lineHeight: '1.2' }"
+        <span class="font-lexi-ui text-lexi-sm font-bold tracking-lexi-tight leading-tight truncate"
+          :class="player ? 'text-lexi-text' : 'text-lexi-text-muted'"
         >
-          {{ player.nickname }}
-        </span>
-        <span
-          v-else
-          :style="{ fontFamily: 'var(--font-panel)', fontSize: '14px', fontWeight: 700, color: '#6b7280', letterSpacing: '-0.02em', lineHeight: '1.2' }"
-        >
-          Waiting…
+          {{ player ? player.nickname : 'Waiting…' }}
         </span>
       </div>
 
-      <div :style="{ borderTop: '1px solid rgba(96,96,96,0.2)', margin: '12px 0 10px' }" />
+      <div class="border-t border-lexi-border-muted my-3" />
 
       <template v-if="player">
-        <div class="text-center" :style="{ marginBottom: '10px' }">
-          <div :style="{ fontFamily: 'var(--font-panel)', fontSize: '36px', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: '1' }">
+        <!-- Score -->
+        <div class="text-center mb-2.5">
+          <span class="font-lexi-numeric text-lexi-2xl font-black text-lexi-text lexi-numeric">
             {{ player.score }}
-          </div>
+          </span>
         </div>
 
-        <div :style="{ borderTop: '1px solid rgba(96,96,96,0.2)', marginBottom: '10px' }" />
+        <div class="border-t border-lexi-border-muted mb-2.5" />
 
+        <!-- Clock row -->
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-1">
-            <span :style="{ fontFamily: 'var(--font-panel)', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', color: '#6b7280' }">TIME</span>
-            <span v-if="player?.overtime_count && player.overtime_count > 0" :style="{ background: '#dc2626', color: '#fff', fontSize: '9px', fontWeight: 900, padding: '1px 5px', borderRadius: '3px', lineHeight: '1.4' }">OT</span>
+            <span class="font-lexi-ui text-lexi-xs font-black tracking-lexi-wide text-lexi-text-muted uppercase">TIME</span>
+            <span
+              v-if="isOvertime"
+              class="font-lexi-ui text-lexi-xs font-black px-1 leading-normal uppercase"
+              :class="player.overtime_count >= 2 ? 'bg-lexi-danger' : 'bg-lexi-warning'"
+              style="color: var(--color-text-on-dark);"
+            >OT·{{ player.overtime_count }}</span>
           </div>
-          <span :style="{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700, letterSpacing: '-0.02em', color: player?.overtime_count && player.overtime_count > 0 ? '#dc2626' : (displaySeconds < 60 ? 'var(--color-panel-clock-warning)' : 'var(--color-panel-clock)'), fontVariantNumeric: 'tabular-nums' }">
+          <span
+            class="font-lexi-numeric text-lexi-base font-bold lexi-numeric"
+            :style="{ color: isClockUrgent ? 'var(--color-panel-clock-urgent)' : 'var(--color-text-primary)' }"
+          >
             {{ formatTime(displaySeconds) }}
           </span>
         </div>
@@ -140,9 +155,9 @@ const dotState = computed(() => {
   </div>
 </template>
 
-<style>
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+<style scoped>
+.panel-card {
+  background: var(--color-panel-bg);
+  border: 2px solid var(--color-panel-border);
 }
 </style>

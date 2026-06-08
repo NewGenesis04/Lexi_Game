@@ -1,230 +1,258 @@
-# NEO Scrabble — UI Design Brief
+# LEXI — Neo-Brutalist UI Design Brief
 
 ## Product Overview
 
 NEO Scrabble is a real-time multiplayer Scrabble web app. Two players, one board, turn-based. The frontend is a Vue 3 SPA driven entirely by server state pushed over SSE — the UI is "dumb," it only renders what the server says.
 
+The design language is **Lexi**: a neo-brutalist system with hard offset shadows (no blur), 2px solid borders, monospace UI text, and full light/dark mode support. Paper meets punch.
+
 ---
 
 ## Visual Identity
 
-**Mood:** Premium, dark-first, warm-toned. Think artisan tabletop craft meets modern fintech dashboard. The palette is built around brass, walnut, and copper with deep shadows and subtle glass/inset effects. Every surface has intentional depth.
+**Mood:** Neo-brutalist, tactile, unapologetically physical. Shadows are hard offsets — 3px, 4px, 6px — never blurred. Borders are always 2px solid. Surfaces feel stamped rather than floated. Light mode evokes cream paper and ink; dark mode feels like a chalkboard in a dim room.
 
 **Typography — layered approach:**
 
 | Context | Font | Weight(s) | Notes |
 |---------|------|-----------|-------|
-| Page body / board letters / headings | **EB Garamond** (serif) | 400, 500, 600 | Primary personality — warm, literary |
-| UI labels / buttons / table headers | **Work Sans** (sans-serif) | 700, 600 | UP100, 0.1em tracking |
-| Player panel name / score / labels | **System UI stack** (`system-ui, -apple-system, sans-serif`) | 700 / 900 | Panels match Bloomberg-standard spec |
-| Clock readout | **SF Mono / JetBrains Mono** (monospace) | 700 | `tabular-nums` for stable alignment |
+| Page / section titles, board letters | **EB Garamond** (serif) | 400–600 | `font-lexi-display` |
+| All UI labels, buttons, table headers | **Space Mono** (monospace) | 700 | `font-lexi-ui`, `tracking-lexi-ui` (0.08em) |
+| Scores, clocks, numeric data | **Space Mono** (monospace) | 700, 900 | `font-lexi-numeric`, `tabular-nums` |
 
-**Palette reference ("Artisan Tabletop" — the only theme in the prototype):**
-
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `surface` | `#131313` | Page background |
-| `surface-container-lowest` | `#0e0e0e` | Deepest surface |
-| `surface-container-low` | `#1b1c1c` | Header, board inset |
-| `surfaceContainer` | `#202020` | Mid container |
-| `surface-container-high` | `#2a2a2a` | Tile rack default |
-| `surface-container-highest` | `#353535` | Rack hover |
-| `onSurface` | `#e5e2e1` | Primary text |
-| `on-surface-variant` | `#d3c3c0` | Secondary text |
-| `outline` | `#9c8d8b` | Brass border |
-| `outline-variant` | `#504442` | Subtle border |
-| `primary` | `#e3beb8` | Brass/copper accent |
-| `on-primary` | `#422a26` | Text on primary |
-| `primary-container` | `#3e2723` | Dark walnut (DW cells, lobby bg) |
-| `secondary` | `#d6c3bc` | Neutral accent |
-| `tertiary` | `#ffb5a0` | Alert/forfeit accent |
-| `tertiary-container` | `#5a1200` | Forfeit button bg |
-| `primary-fixed-dim` | `#e3beb8` | Rack selected gradient |
-| Board DL bg | `#1e405a` | Cool blue |
-| Board DL label | `#7ab8d4` | Light blue |
-| Board TL bg | `#0e2433` | Dark blue |
-| Board TL label | `#5a9ec4` | Mid blue |
-| Board DW / ★ bg | `primary-container` (`#3e2723`) | Dark walnut |
-| Board DW / ★ label | `primary-fixed-dim` (`#e3beb8`) | Brass |
-| Board TW bg | `#3d1414` | Dark crimson |
-| Board TW label | `#d47a7a` | Light red |
-| Placed tile bg | `#d4c5a9` | Warm beige |
-| Placed tile letter | `#1a1a1a` | Near-black |
+No sans-serif anywhere in the system. Space Mono is the single voice for all chrome.
 
 ---
 
-### Premium Design System
+### Palette — Light Mode (`[data-theme="light"]`)
 
-#### Depth & Layers
-- **Board container:** 2px brass border (`colors.outline`), `linear-gradient(180deg, #131313 → #1b1c1c)` bg, `0 6px 24px rgba(0,0,0,0.6)` drop shadow + `inset 0 1px 0 rgba(255,255,255,0.06)` highlight
-- **Board cells:** `1px` solid border, `inset 0 1px 2px rgba(0,0,0,0.3)` shadow, `box-sizing: border-box`
-- **Placed tiles:** `0 2px 6px rgba(0,0,0,0.5)` drop shadow, warm beige bg with dark lettering + light text-shadow
-- **Rack tiles:** Overshoot cubic-bezier hover lift (`translateY(-3px) scale(1.06)`), selected lifted further (`-6px`) with primary ring
-- **Player panels:** Semi-transparent `rgba(38,38,38,0.4)` bg, subtle `rgba(96,96,96,0.3)` border, separated into vertical blocks
-- **Cards/Cards:** Glass morphism via semi-transparent bg on dark, subtle border
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--color-bg` | `#F5F0E4` | Page background |
+| `--color-bg-elevated` | `#FAF7F0` | Cards, panels, modals |
+| `--color-bg-sunken` | `#EDE4D0` | Rack, board inset, inputs |
+| `--color-text-primary` | `#0F0F0F` | Body copy, headings |
+| `--color-text-secondary` | `#555555` | Labels, captions |
+| `--color-text-muted` | `#777777` | Hints, placeholders |
+| `--color-primary` | `#F5CC42` | Acid Yellow — brand accent, selected tiles |
+| `--color-secondary` | `#2D64D4` | Cobalt Blue |
+| `--color-danger` | `#D42B14` | Brick Red |
+| `--color-success` | `#1F8040` | Forest Green |
+| `--color-warning` | `#C85520` | Terracotta |
+| `--color-border` | `#0F0F0F` | Black ink — default border |
+| `--color-border-subtle` | `#555555` | Subtle border |
+| `--color-border-muted` | `#AAAAAA` | Muted border |
 
-#### Premium Square Colours
-Premium squares do NOT use gradients. Each type gets a solid deep background with a contrasting muted label:
+### Palette — Dark Mode (`[data-theme="dark"]`)
 
-| Square | Background | Label Colour |
-|--------|-----------|-------------|
-| DL (×2 letter) | `#1e405a` (cool navy) | `#7ab8d4` (light blue) |
-| TL (×3 letter) | `#0e2433` (deep navy) | `#5a9ec4` (mid blue) |
-| DW (×2 word) | `#3e2723` (dark walnut) | `#e3beb8` (brass) |
-| TW (×3 word) | `#3d1414` (dark crimson) | `#d47a7a` (light red) |
-| ★ (center) | `#3e2723` (dark walnut) | `#e3beb8` (brass) |
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--color-bg` | `#1A1A1A` | Page background |
+| `--color-bg-elevated` | `#252525` | Cards, panels, modals |
+| `--color-bg-sunken` | `#0F0F0F` | Rack, board inset, inputs |
+| `--color-text-primary` | `#E5E5E5` | Body copy, headings |
+| `--color-text-secondary` | `#AAAAAA` | Labels, captions |
+| `--color-text-muted` | `#777777` | Hints, placeholders |
+| `--color-primary` | `#687A40` | Dusty Olive — brand accent, selected tiles |
+| `--color-secondary` | `#5A7294` | Muted Slate |
+| `--color-danger` | `#E85A44` | Muted Brick |
+| `--color-success` | `#3CAF64` | Muted Forest |
+| `--color-warning` | `#A88C80` | Muted Terracotta |
+| `--color-border` | `#E5E5E5` | Near-white — default border |
+| `--color-border-subtle` | `#AAAAAA` | Subtle border |
+| `--color-border-muted` | `#555555` | Muted border |
 
-Labels rendered in Work Sans, 8px, 700 weight, 0.1em tracking.
+### Invariant Tokens (same in both modes)
 
-#### Gradients
-- Board container: subtle diagonal/vertical from `surface-dim` to `surface-container-low`
-- Rack tiles: `linear-gradient(180deg, surface-container-high → surfaceContainer)` default, primary gradient when selected
-- Action buttons: `linear-gradient(180deg, outline → #8a7d7b)` for submit/create/join
-- Rack background: `linear-gradient(180deg, surface-container-low → surfaceContainer)`
+**Shadows (no blur — the brutalist signature):**
 
-#### Shadows
-- Board container: `0 6px 24px rgba(0,0,0,0.6)` + `inset 0 1px 0 rgba(255,255,255,0.06)`
-- Cells: `inset 0 1px 2px rgba(0,0,0,0.3)` (empty), `0 2px 6px rgba(0,0,0,0.5)` (occupied)
-- Rack tiles: `0 1px 3px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.08)` (default); `0 4px 12px` (hovered); `0 2px 8px` + `0 0 0 1px primary` (selected)
-- Player panels: none (only the thin border)
-- Buttons: `0 2px 4px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.15)` for filled; none for outlined
-- Card/lobby: `0 2px 8px rgba(0,0,0,0.5)`
+| Token | Value | Usage |
+|-------|-------|-------|
+| `shadow-lexi-sm` | `3px 3px 0px var(--color-border)` | Buttons, small tiles |
+| `shadow-lexi-md` | `4px 4px 0px var(--color-border)` | Cards, panels |
+| `shadow-lexi-lg` | `6px 6px 0px var(--color-border)` | Board container, modals |
+| `shadow-lexi-pressed` | `1px 1px 0px var(--color-border)` | Active/pressed state |
+| `shadow-lexi-tile-hover` | `6px 8px 0px var(--color-border)` | Rack tile hover |
+| `shadow-lexi-tile-selected` | `6px 10px 0px var(--color-border)` | Rack tile selected |
 
-#### Animations
-- Rack tile hover: `translateY(-3px) scale(1.06)` with `cubic-bezier(0.34, 1.56, 0.64, 1)`, 200ms
-- Rack tile selected: `translateY(-6px)` same curve
-- Notification bar: `slideUp` keyframe (translateY 100%→0 + opacity), 250ms
-- Game over overlay: `fadeIn` (opacity 0→1 + scale 0.95→1), 400ms
-- Connection dot: `pulse` keyframe (opacity 1→0.4→1, 2s infinite) for connected-but-not-turn
+**Border radius:**
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `rounded-lexi-xs` | `2px` | Tiles, board cells |
+| `rounded-lexi-sm` | `4px` | Buttons, inputs, badges |
+| Cards, board container | `0px` | Brutalist — no radius |
+
+---
+
+### Premium Board Squares
+
+Board squares use flat fills with high label contrast. No gradients.
+
+| Square | Light bg | Light label | Dark bg | Dark label |
+|--------|----------|-------------|---------|------------|
+| DL (×2 letter) | `#C2D9FA` (cobalt-200) | `#1A3A6E` (cobalt-700) | `#1C2535` (slate-700) | `#B8CCE0` (slate-200) |
+| TL (×3 letter) | `#F8CEB8` (terra-200) | `#6B2A10` (terra-700) | `#2A1810` (mterra-700) | `#CEB8B0` (mterra-200) |
+| DW (×2 word) | `#B8EDD0` (forest-200) | `#0D3D1A` (forest-700) | `#0D3D1A` (forest-700) | `#B8EDD0` (forest-200) |
+| TW (×3 word) | `#FAC4BC` (brick-200) | `#7A1A0A` (brick-700) | `#7A1A0A` (brick-700) | `#F49080` (brick-300) |
+| ★ (center) | `#FAE080` (yellow-300) | `#0F0F0F` (ink-900) | `#1E2410` (olive-700) | `#E4EDD4` (olive-100) |
+
+Labels in Space Mono, 10px, 700 weight, 0.12em tracking. Shown only when cell is empty.
+
+---
+
+### The Neo-Brutalist Signature
+
+Every interactive element follows the same physical metaphor:
+
+| State | Shadow | Transform | Transition |
+|-------|--------|-----------|------------|
+| Default | `shadow-lexi-md` | none | — |
+| Hover | `shadow-lexi-lg` | `translate(-1px, -1px)` | `150ms ease` |
+| Active | `shadow-lexi-pressed` | `translate(2px, 2px)` | immediate |
+
+Rack tiles use an overshoot spring: `cubic-bezier(0.34, 1.20, 0.64, 1)`, 200ms.
+Default → hover lifts `(-2px, -4px)`. Selected lifts further `(-2px, -6px)`.
 
 ---
 
 ## Screen 1: Lobby (Create / Join)
 
-A centered card on a `#131313` page with no header. Just the card floating in dark space.
+A centered card on page background with no header. Just the card floating in dark/light space.
 
 **Layout:**
-- Centered card, max `400px` wide, `background: #3e2723` (primary-container), `1px solid #9c8d8b` (outline) border, `0 2px 8px rgba(0,0,0,0.5)`, `rounded-lg`, padding 32px
-- Title "NEO SCRABBLE" — EB Garamond, 32px, 500 weight, `color: #e3beb8` (primary), centered
-- Two tab buttons below in a segmented control: `background: #0e0e0e` (surface-container-lowest), 2px padding
-  - Active tab: `background: #9c8d8b` (outline), text `#0e0e0e`, Work Sans, 700, 0.1em tracking, uppercase
-  - Inactive tab: transparent bg, text `#d3c3c0` (on-surface-variant)
-- Form fields inside the active tab vertically stacked with generous gap
-  - Inputs: `background: #0e0e0e`, `1px solid #504442` border, `inset 0 2px 4px rgba(0,0,0,0.5)` shadow, EB Garamond 18px or Work Sans 12px
+- Centered card, max `384px` wide, `bg-lexi-bg-elevated`, `border-lexi border-lexi-border`, `shadow-lexi-lg`, padding 32px
+- Title "LEXI" — Space Mono, 32px, 700 weight, uppercase, 0.12em tracking, centered
+- **Avatar picker** — 5-column grid, 10 Multiavatar PNGs. Selected avatar: `border-lexi border-lexi-primary shadow-lexi-sm -translate-x-px -translate-y-px`. Unselected: `border-lexi-light border-lexi-border-muted`. Randomly assigned on mount.
+- **Tab switcher** — Two buttons (CREATE / JOIN) side by side, separated by a 2px black border. Active tab: `bg-lexi-primary text-lexi-text-on-accent`. Inactive: transparent bg, secondary text.
+- **Form fields** vertically stacked with 16px gap:
+  - Inputs: `bg-lexi-bg-sunken`, `border-lexi border-lexi-border`, `shadow-lexi-sm`, Space Mono 14px, placeholder text in muted color, `focus:shadow-lexi-md focus:-translate-x-px focus:-translate-y-px`
   - Selects: same styling as inputs
-  - Submit button: `linear-gradient(180deg, #9c8d8b → #8a7d7b)`, text `#0e0e0e`, Work Sans 12px 700, 0.1em tracking, `0 2px 4px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.15)`, full-width
-- No decorative elements. Pure typography, spacing, and material depth.
+  - Submit button: `bg-lexi-primary text-lexi-text-on-accent`, `border-lexi border-lexi-border`, `shadow-lexi-md`, full-width, Space Mono 12px 700 uppercase 0.12em tracking. Hover: `shadow-lexi-lg -translate-x-px -translate-y-px`. Active: `shadow-lexi-pressed translate-x-0.5 translate-y-0.5`. Disabled: `opacity-40`
+- **Theme toggle** — Absolute top-right corner, 36×36px, `border-lexi border-lexi-border shadow-lexi-sm`, sun/moon SVG. Toggles between light and dark.
+- Error text: `text-lexi-danger`, Space Mono 10px, centered below form.
 
 ---
 
 ## Screen 2: Game Board (Main Play Screen)
 
-The core screen. Must feel like a premium physical board game — depth, gloss, and tactile feedback.
+The core screen. Neo-brutalist physicality — the board feels like a stamped object on a textured surface.
 
 **Overall Layout:**
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│ Header                          Theme    Leave        │
+│ Header (code COPY)          ☀ HISTORY  LEAVE          │
 ├──────────────────────────────────────────────────────┤
 │                                                        │
-│   ┌──────┐               ┌──────────┐   ┌──────┐      │
-│   │Player│     Bag(◉)    │  BOARD   │   │Player│      │
-│   │Panel │               │  15×15   │   │Panel │      │
-│   │(opp) │               │ premium  │   │(you) │      │
-│   └──────┘               │ squares  │   └──────┘      │
-│                          │ visible  │                  │
-│                          └──────────┘                  │
-│                          ┌──────────┐                  │
-│                          │ TILE     │                  │
-│                          │ TRAY     │                  │
-│                          │ (rack)  ⇄│  (shuffle btn)   │
-│                          └──────────┘                  │
-│                          ┌──────────┐                  │
-│                          │ CONTROLS │                  │
-│                          │ (buttons)│                  │
-│                          └──────────┘                  │
+│   ┌──────┐  ┌───┐  ┌──────────┐   ┌──────┐           │
+│   │Player│  │Bag│  │  BOARD   │   │Player│           │
+│   │Panel │  │◉  │  │  15×15   │   │Panel │           │
+│   │(opp) │  └───┘  │ premium  │   │(you) │           │
+│   └──────┘         │ squares  │   └──────┘           │
+│                    │ visible  │                        │
+│                    └──────────┘                        │
+│                    ┌──────────┐                        │
+│                    │ TILE     │                        │
+│                    │ TRAY     │                        │
+│                    │ (rack)  ⇄│  (shuffle btn)        │
+│                    └──────────┘                        │
+│                    ┌──────────┐                        │
+│                    │ CONTROLS │                        │
+│                    │ (buttons)│                        │
+│                    └──────────┘                        │
 │                                                        │
 ├────────────────────────────────────────────────────────┤
 │              Notification Bar (fixed overlay)           │
 └────────────────────────────────────────────────────────┘
 ```
 
-On wide screens (lg+): board centered, player panels flank left/right in `flex-row`.
-On narrow screens: everything stacks vertically in `flex-col`, panels go top/bottom.
+On wide screens (lg+): board centered, player panels flank left/right.
+On narrow screens: everything stacks vertically.
 
 ### Header
-- Left: "GAME · XY7K9M" — Work Sans, 12px, 700, 0.1em tracking, `color: #d3c3c0` (on-surface-variant)
-- Right:
-  - "Theme" text button — Work Sans 12px 700, `color: #d6c3bc` (secondary), `1px solid #9c8d8b` outline, transparent bg, hover fills to `#2a2a2a`
-  - "Leave" — Work Sans 12px 700, `background: #5a1200` (tertiary-container), text `#ffb5a0` (tertiary), `0 2px 4px rgba(0,0,0,0.3)`, hover dims
+
+- **Left:** "GAME · XY7K9M" — clickable, copies code to clipboard. Space Mono 11px, 700, 0.12em tracking, secondary text. Copy icon (12px SVG) next to label.
+- **Right (L→R):**
+  - **Theme toggle** — sun/moon SVG icon button, 32×32px, `text-lexi-text-secondary hover:text-lexi-text`
+  - **HISTORY** — `border-lexi border-lexi-border-muted shadow-lexi-sm`, Space Mono 10px 700 uppercase 0.12em tracking, secondary text. Hover: `shadow-lexi-md -translate-x-px -translate-y-px`
+  - **LEAVE** — `border-lexi border-lexi-danger text-lexi-danger shadow-lexi-sm`, Space Mono 10px 700 uppercase 0.12em tracking. Hover: `shadow-lexi-md -translate-x-px -translate-y-px`
 
 ### Player Panel (×2 — opponent left/top, you right/bottom)
-A compact card, `w-44` (176px), with the following structure:
+
+A compact card, 176px wide (w-44):
 
 ```
-┌─────────────────────────────┐  ← emerald 2px top border if active turn
-│  ● Player Name              │     otherwise 1px standard border
+┌─────────────────────────────┐  ← 4px primary top border if active turn
+│  ┌──────┐                   │     otherwise 2px standard border
+│  │avatar│ ● Player Name     │
+│  └──────┘                   │
 │─────────────────────────────│
 │                             │
-│          137                │  ← 36px, 900 weight, tabular-nums
+│          137                │  ← 32px, 900 weight, tabular-nums
 │                             │
 │─────────────────────────────│
-│  TIME              5:42     │  ← micro label 9px / mono 15px
+│  TIME          5:42  OT·1   │  ← micro label 10px / mono 16px
 └─────────────────────────────┘
 ```
 
-- `background: rgba(38,38,38,0.4)`
-- `border: 1px solid rgba(96,96,96,0.3)`
-- Active turn: `borderTop: 2px solid #10b981` (emerald)
-- Inactive/disconnected: `opacity: 0.5` (disconnected only)
-- System font stack throughout (`system-ui, -apple-system, sans-serif`)
-- Separator lines: `1px solid rgba(96,96,96,0.2)`
-- Connection dot: 6px circle
-  - **Green** (`#10b981`) + glow: active turn + connected
-  - **Pulsing emerald** (`#34d399`) + pulsing: connected but not turn
-  - **Muted gray** + no glow: disconnected
-- Name: 14px, 700 weight, `#e5e5e5`, `-0.02em` tracking
-- Score: 36px, 900 weight, white, `-0.03em` tracking, `font-variant-numeric: tabular-nums`
-- "TIME" label: 9px, 900 weight, `#6b7280`, `0.15em` tracking
-- Clock: SF Mono / JetBrains Mono, 15px, 700 weight, `#a3a3a3` (`#ffb5a0` when < 60s)
+- `bg-lexi-panel`, `border-lexi border-lexi-panel-border`, `shadow-lexi-sm`
+- Active turn: `border-t-4 border-t-lexi-panel-accent shadow-lexi-md`
+- Inactive/disconnected: `opacity-50` (disconnected only)
+- **Avatar:** 56×56px image, 1px border, with connection dot overlay (10px circle, positioned bottom-0.5 right-0.5, 2px border matching panel bg)
+- **Connection dot:**
+  - **Active turn + connected:** `bg-lexi-dot-active` + `box-shadow: 0 0 6px var(--color-dot-active)`
+  - **Connected, not turn:** `bg-lexi-dot-waiting` + `animation: lexi-pulse-dot 2s ease-in-out infinite`
+  - **Disconnected:** `bg-lexi-dot-offline`
+- **Name:** Space Mono, 12px, 700, `-0.02em` tracking
+- **Score:** Space Mono, 32px, 900 weight, `-0.02em` tracking, `font-variant-numeric: tabular-nums`
+- **TIME label:** Space Mono, 10px, 900, uppercase, 0.12em tracking, muted
+- **OT badge:** Shown when `overtime_count > 0`. Space Mono 10px 900, uppercase, `bg-lexi-warning` (1 OT) or `bg-lexi-danger` (2+ OT), dark text
+- **Clock ticker:** Pings server timestamp, counts down in real-time while active turn, freezes otherwise. Space Mono, 16px, 700, `tabular-nums`. Turns `clock-urgent` when < 60s or in overtime
 
 ### Bag Indicator
-A standalone pill badge positioned above the board:
-- `background: rgba(38,38,38,0.4)`, `border-radius: 999px`, `border: 1px solid rgba(96,96,96,0.3)`
-- Contains `bag.svg` icon (16×16) + remaining tile count in system font 12px 700
+
+Compact badge above the board:
+- `bg-lexi-bg-sunken`, `border-lexi-light border-lexi-border`, inline-flex
+- `bag.svg` icon (16×16) + remaining tile count in Space Mono 11px 700
 
 ### Board (15×15 Grid)
+
 The visual anchor.
-- **Container:** `border-radius: 0.625rem`, `border: 2px solid #9c8d8b`, `background: linear-gradient(180deg, #131313 → #1b1c1c)`, `box-shadow: 0 6px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)`, padding 8px
-- **Cells:** 36×36px (w-9 h-9), each wrapped in a 1px padding cell (`p-[1px]`)
-  - `box-sizing: border-box` on the inner cell div
-  - `border: 1px solid ...` (outline-variant for empty, outline for occupied)
-  - `border-radius: 0.125rem`
-  - Empty cells: `inset 0 1px 2px rgba(0,0,0,0.3)` shadow
-  - Occupied cells: `0 2px 6px rgba(0,0,0,0.5)` shadow
-- **Premium labels:** Work Sans 8px 700, shown only when cell is empty
-- **Placed tiles:** warm beige (`#d4c5a9`) bg, EB Garamond 18px 600 letter in `#1a1a1a` with `0 1px 0 rgba(255,255,255,0.3)` text-shadow, points in Work Sans 8px at bottom-right in `#5a4a3a`
-- **Labels:** Row numbers (1–15) and column letters (A–O) on all four sides in Work Sans 12px 700
+- **Container:** `border-lexi border-lexi-board-border`, `bg-lexi-board`, `shadow-lexi-lg`, padding 8px, no border-radius
+- **Cells:** 36×36px each (`w-lexi-cell h-lexi-cell`), inside a 1px padding wrapper (`p-[1px]`)
+  - `border-lexi-light` and `border-lexi-cell-border` (empty) or `border-lexi-placed-border` (occupied)
+  - `rounded-lexi-xs`
+  - Empty cells: flat bg per square type
+  - Placed: `bg-lexi-placed` with letter in `text-lexi-placed-text` (EB Garamond 18px 600) and points in `text-lexi-placed-points` (Space Mono 8px 700, bottom-right)
+- **Premium labels:** Space Mono, 10px, 700, 0.12em tracking, shown only when cell is empty
+- **Ghost tiles:** Pending placements shown with `?` for blanks, muted styling
+- **Blank picker:** Clicking a ghost blank tile opens an A–Z popover grid to assign its letter
+- **Labels:** Row numbers (1–15) and column letters (A–O) on all four sides in Space Mono 12px 700
 
 ### Tile Tray (Rack)
-A sleek horizontal strip below the board:
-- `background: linear-gradient(180deg, #1b1c1c → #202020)`, `border-radius: 0.375rem`, `border: 1px solid #504442`, `inset 0 1px 2px rgba(0,0,0,0.3)`, padding 6px
+
+A horizontal strip below the board:
+- `bg-lexi-bg-sunken`, `border-lexi border-lexi-border`, `shadow-lexi-sm`, padding 6px
 - 7 tile slots + 1 shuffle button, flex row with 6px gap
-- Each tile: 44×44px
-  - Default: `linear-gradient(180deg, #2a2a2a → #202020)`, `1px solid #504442`, `0 1px 3px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.08)`
-  - Hovered: `translateY(-3px) scale(1.06)`, gradient `#353535 → #2a2a2a`, `0 4px 12px rgba(0,0,0,0.5)` + `inset 0 1px 0 rgba(255,255,255,0.12)`
-  - Selected: `translateY(-6px)`, gradient `#e3beb8 → #e3beb8`, emerald ring `0 0 0 1px #e3beb8`, `0 2px 8px rgba(0,0,0,0.5)` + `inset 0 1px 0 rgba(255,255,255,0.15)`, border becomes `#e3beb8`
-  - Transition: `all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)` (overshoot spring)
-- Letter: EB Garamond, 20px, 600 weight; default `#d3c3c0` with `0 1px 2px rgba(0,0,0,0.5)` text-shadow; selected `#422a26` (on-primary)
-- Points: Work Sans, 8px, 600; default `#9c8d8b`; selected `#422a26`
-- **Shuffle button:** 36×36px, transparent bg, `1px solid #504442` border, `border-radius: 0.375rem`, cross-arrows SVG icon in `#9c8d8b`, hover dims to 70% opacity
+- Each tile: 44×44px (`w-lexi-tile h-lexi-tile`)
+  - Default: `bg-lexi-tile`, `border-lexi border-lexi-tile-border`, `shadow-lexi-sm`
+  - Hover: `shadow-lexi-tile-hover -translate-x-0.5 -translate-y-1`
+  - Selected: `bg-lexi-tile-selected`, `shadow-lexi-tile-selected -translate-x-0.5 -translate-y-1.5`, `border-lexi-tile-selected-border`
+  - Swap mode: `border-lexi-danger` tint
+  - Transition: `all 200ms cubic-bezier(0.34, 1.20, 0.64, 1)` (overshoot spring)
+- Letter: EB Garamond, 18px, 600; default `text-lexi-tile-text`; selected `text-lexi-tile-selected-text`
+- Points: Space Mono, 10px, 700; default `text-lexi-tile-points`; selected `text-lexi-tile-selected-text`
+- **Shuffle button:** 36×36px, `border-lexi border-lexi-border-muted`, `rounded-sm`, cross-arrows SVG
 
 ### Controls (below tile rack)
-A horizontal row of 5 buttons, `gap-2`, `items-center justify-center`:
-- **Submit** — `linear-gradient(180deg, #9c8d8b → #8a7d7b)`, text `#0e0e0e`, `0 2px 4px rgba(0,0,0,0.4)` + `inset 0 1px 0 rgba(255,255,255,0.15)`, `border-radius: 0.25rem`, padding 8px 20px, Work Sans 12px 700, hover dims
-- **Clear / Swap / Pass** — transparent bg, `1px solid #504442`, text `#d3c3c0`, padding 8px 16px, hover fills to `#2a2a2a`
-- **Forfeit** — `background: #5a1200`, text `#ffb5a0`, `1px solid #ffb5a0`, `0 2px 4px rgba(0,0,0,0.3)`, hover dims
+
+A horizontal row of 5 buttons, 8px gap, centered:
+- **Submit** — `bg-lexi-primary text-lexi-text-on-accent`, `border-lexi border-lexi-border`, `shadow-lexi-md`, Space Mono 11px 700 uppercase 0.12em tracking, padding 8px 20px. Shown when tiles are placed or swap-selected. Hover: `shadow-lexi-lg -translate-x-px -translate-y-px`
+- **Clear** — transparent bg, `border-lexi border-lexi-border-muted`, secondary text. Shown only when placements exist.
+- **Swap / Cancel** — toggle button. Inactive: "SWAP" with standard ghost styling. Active: "CANCEL" with `border-lexi-danger` tint.
+- **Pass** — transparent bg, `border-lexi border-lexi-border-muted`, secondary text
+- **Forfeit** — `border-lexi border-lexi-danger text-lexi-danger`, `shadow-lexi-sm`, Space Mono 10px 700. Hover: `shadow-lexi-md -translate-x-px -translate-y-px`
 
 ---
 
@@ -232,49 +260,144 @@ A horizontal row of 5 buttons, `gap-2`, `items-center justify-center`:
 
 When game phase is 'finished', the board remains visible but a centered overlay appears.
 
-**Overlay card:**
-- `background: rgba(19,19,19,0.9)`, full-screen fixed, flex centered
-- Card: `background: #1b1c1c` (surface-container-low), `border-radius: 0.5rem`, `border: 1px solid #9c8d8b`, `0 4px 24px rgba(0,0,0,0.6)`, padding 32px, max-width 360px
-- "GAME OVER" — EB Garamond 32px 600, `color: #d3c3c0`
-- Winner name — EB Garamond 28px 500, `color: #e3beb8` (primary)
-- Winner score — Work Sans 36px 600, `color: #e5e2e1`
+**Overlay:**
+- Full-screen fixed, `bg-lexi-overlay` (semi-transparent backdrop)
+- Card: `bg-lexi-overlay-card`, `border-lexi border-lexi-overlay-border`, `shadow-lexi-lg`, padding 32px, max-width 360px
+- Top border: `border-t-4` — primary (won), amber (forfeit), or danger (timeout)
+
+**Content:**
+- Heading row: "YOU WON" / "YOU LOST" / "GAME OVER" — Space Mono, 11px, 700, uppercase, 0.12em tracking, secondary text
+- Winner name — EB Garamond, 28px, 500, primary color
+- Winner score — Space Mono, 36px, 700
 - Final scores section:
-  - Each player row: `background: #202020` (surfaceContainer), `1px solid #504442`, `border-radius: 0.375rem`, flex row with name (EB Garamond 18px) and score (Work Sans 24px 600)
-  - Winner score: `color: #e3beb8` | Loser score: `color: #ffb5a0`
-- "Play Again" button — same gradient brass style as Submit
+  - Each player row: `bg-lexi-bg-sunken`, `border-lexi border-lexi-border-muted`. Flex row with avatar (32×32px) + name (EB Garamond 18px) + score (Space Mono 24px 700, tabular-nums)
+  - Winner score: primary color | Loser score: danger color
+- **Play Again** button — same style as primary Submit button
+
+**End variants:**
+- `normal`: Highest score wins. Heading alternates "YOU WON" / "YOU LOST"
+- `forfeit`: Opponent forfeited. Heading "YOU WON" always for remaining player
+- `timeout`: Opponent timed out. Heading "YOU WON" for remaining player
 
 ---
 
-## Notification Bar (Fixed Overlay)
+## Screen 4: Game Paused
 
-A fixed bar at the very bottom of the screen, spanning full width, ~30px tall.
-- `background: #1b1c1c` (surface-container-low), `border-top: 1px solid #504442` (outline-variant)
-- `fixed bottom-0 left-0 right-0 z-50`
-- Appears with `slideUp` animation (250ms, translateY 100% → 0)
-- Auto-cycles through 3 notification types every 3.5s:
-  1. Self-move: "**You** played **STARE** +24" (dot: `#e3beb8`)
-  2. Opponent-move: "**Jax** played **QUITE** +18" (dot: `#d6c3bc`)
-  3. Connected: "**Jax** connected" (dot: `#4caf50`)
+When game phase is 'paused' (player disconnect):
+
+**Overlay:**
+- Full-screen fixed, `bg-lexi-overlay`
+- Card: `bg-lexi-overlay-card`, `border-lexi border-lexi-overlay-border`, `shadow-lexi-lg`, `border-t-4 border-lexi-warning`
+- "GAME PAUSED" — Space Mono, 11px, 700, uppercase, 0.12em tracking, warning color
+- "Waiting for reconnection" — Space Mono, 12px, secondary text
+- Players listed with CONNECTED / OFFLINE status labels (connected: `text-lexi-success`, offline: `text-lexi-text-muted`)
+- **LEAVE GAME** — `border-lexi border-lexi-danger text-lexi-danger shadow-lexi-sm`, Space Mono 10px 700 uppercase
+
+---
+
+## Move History Sidebar
+
+Slide-out panel toggled by the HISTORY button in the header.
+
+**Structure:**
+- Fixed left panel, 260px wide, `bg-lexi-bg-elevated`, `border-r-2 border-lexi-border`, `shadow-lexi-lg`
+- Overlay scrim: `rgba(0,0,0,0.5)`, click to dismiss
+- Slide transition: `transform 200ms ease`, from `translateX(-100%)`
+
+**Header:**
+- "MOVE HISTORY" — Space Mono, 11px, 700, uppercase, 0.12em tracking, secondary text
+- Close button (✕)
+- Legend: two swatches (10×10px) — mine (primary/yellow) / opponent (secondary/slate)
+
+**Move list (reversed):**
+- Each row: 6px 12px padding, bottom border
+- Background: mine = primary-subtle, opponent = secondary-subtle
+- Player name (uppercase, Space Mono 9px 700, 42px fixed width)
+- Middle dot separator
+- Word in EB Garamond 17px 500 (for place moves) | Action label in Space Mono 9px 700 (SWAP/PASS/FORFEIT/TIME OUT)
+- Score delta (+24) in Space Mono 11px 700, tabular-nums, 34px fixed width
+
+**Footer:**
+- Space Mono 9px 700 uppercase, muted text
+- Total move count + current scores
+
+**Empty state:** "No moves yet" centered, 80px height, muted text.
+
+---
+
+## Toast System
+
+Two-tier notification:
+
+### BoardBanner (above the board)
+- Fixed-height (36px) wrapper showing the most recent toast
+- Dot color per type, click to dismiss
+- Auto-height wrapper prevents layout shift
+
+### ToastFooter (fixed overlay)
+- Fixed-bottom 30px bar, full width
+- `bg-lexi-notif`, `border-t-2 border-lexi-notif-border`
+- Appears with `lexi-slide-up` animation (250ms, translateY 100% → 0)
+- Single toast visible at a time, auto-cycles every 5s
+- Colored dot: error = danger, success = success, warning = warning, info = primary
+- Text: Space Mono 11px, `text-lexi-notif-text`
 - Click to dismiss
-- Hidden when no notification is active
-- Text: system font 12px, `color: #d3c3c0` with bold user names in `#e5e2e1`
-- Does NOT push content — overlays as fixed layer
 
 ---
 
-## Persistent UI: Settings Panel
+## Theme Toggle
 
-(The prototype has a "Theme" button in the header but no dropdown panel yet — placeholder for future.)
+Light/dark mode controlled via `data-theme` attribute on `<html>`:
+- `data-theme="light"` — cream paper surfaces, ink black borders, acid yellow accent
+- `data-theme="dark"` — near-black surfaces, near-white borders, dusty olive accent
+
+Toggle button appears in both LobbyView (top-right corner) and GameView header. Sun icon shown in dark mode (click goes light), moon icon in light mode (click goes dark). Persisted to `localStorage`. Default: system preference with light fallback.
+
+---
+
+## Avatar System
+
+10 unique Multiavatar PNGs shipped in `src/assets/avatars/`.
+
+**Where they appear:**
+1. **Lobby:** 5-column grid picker, randomly assigned on mount. Selection highlighted with primary border + shadow offset.
+2. **Player Panel:** 56×56px image with connection dot overlay. No image → plain dot only.
+3. **Game Over:** 32×32px image next to each player's score row.
+
+Avatar key (`avatar?: string`) sent with create/join API requests and stored in `PlayerSession`.
+
+---
+
+## Overtime System
+
+When a player's clock reaches 0:
+- `-10` point penalty applied
+- `+60` seconds added to their clock
+- `overtime_count` incremented per occurrence
+- Toast notification: "nickname ran out of time — -10 pts, +60s overtime"
+- PlayerPanel shows OT badge: `OT·1`, `OT·2`, etc.
+  - 1 OT: `bg-lexi-warning` (amber)
+  - 2+ OT: `bg-lexi-danger` (red)
+- Clock text turns `clock-urgent` when in overtime or < 60s remaining
+
+---
+
+## Blank Tile Letter Picker
+
+When a blank tile (letter ` `) is placed on the board as a ghost:
+- Clicking the ghost opens a 7-column A–Z popover grid
+- Selecting a letter locks it for that board position
+- `blankLetterMap: Map<string, string>` tracks `"row,col" → letter` pairs
 
 ---
 
 ## Design Principles
 
-1. **The board is king.** Everything else is chrome. The board should feel like a premium physical object on a dark felt table — depth, shadow, and gloss make it tangible.
-2. **One action per tap.** Never ask the user to confirm. Submit sends immediately. Clear is instant.
-3. **Silence is the interface.** Empty states are just dark space. No spinners unless loading. No toasts unless something happened.
-4. **Notifications are a ticker, not a popup.** They live in a slim fixed bar at the bottom. 30px, auto-dismiss, click to dismiss. They don't interrupt.
-5. **Premium squares whisper.** The board tells you where you are through colour and subtle labels, not through screaming bright badges.
-6. **Warmth over coldness.** The palette uses warm brass, walnut, and copper tones rather than cool blues/greys. This creates a tactile, physical-game feel.
-7. **Depth serves clarity.** Shadows, gradients, and inset effects are not decoration — they create hierarchy and guide the eye to the board and tiles.
-8. **Connection state is explicit.** Green = your turn, pulsing emerald = connected (waiting), gray = disconnected. Tells the player exactly what's happening.
+1. **The board is king.** Everything else is chrome. The board should feel stamped into the page — hard shadow, thick border, no radius.
+2. **Neo-brutalism is not a joke.** Hard shadows, thick borders, monospace UI. No blur, no gradient backgrounds on components (only flat fills), no rounded corners on containers.
+3. **One action per tap.** Never ask the user to confirm. Submit sends immediately. Clear is instant.
+4. **Silence is the interface.** Empty states are just empty space. No spinners unless loading. No toasts unless something happened.
+5. **Dual-mode, equal citizens.** Light and dark are not afterthoughts — they're both first-class themes with their own palette mappings.
+6. **Connection state is explicit.** Active turn = green + glow. Connected waiting = pulsing emerald. Disconnected = gray mute.
+7. **Avatars are identity.** Every player gets a unique abstract avatar. The avatar is the primary visual identifier, not the nickname.
+8. **History is a sidebar, not a ticker.** Moves are reviewed in a slide-out panel, not a bottom bar.

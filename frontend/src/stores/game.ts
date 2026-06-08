@@ -104,17 +104,18 @@ export const useGameStore = defineStore('game', () => {
     nickname: string,
     time_per_player_secs: number,
     dictionary: Dictionary,
+    avatar?: string,
   ) {
-    const res = await apiCreateGame({ nickname, time_per_player_secs, dictionary })
-    session.value = { token: res.token, player_id: res.player_id, nickname }
+    const res = await apiCreateGame({ nickname, time_per_player_secs, dictionary, avatar })
+    session.value = { token: res.token, player_id: res.player_id, nickname, avatar }
     const state = await apiFetchGame(res.code, res.token)
     updateLocalState(state)
     return res
   }
 
-  async function joinGame(code: string, nickname: string) {
-    const res = await apiJoinGame(code, { nickname })
-    session.value = { token: res.token, player_id: res.player_id, nickname }
+  async function joinGame(code: string, nickname: string, avatar?: string) {
+    const res = await apiJoinGame(code, { nickname, avatar })
+    session.value = { token: res.token, player_id: res.player_id, nickname, avatar }
     updateLocalState(res.state)
     return res
   }

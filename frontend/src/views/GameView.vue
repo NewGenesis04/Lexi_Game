@@ -7,7 +7,12 @@ import GameBoard from '../components/game/GameBoard.vue'
 import TileRack from '../components/game/TileRack.vue'
 import PlayerPanel from '../components/ui/PlayerPanel.vue'
 import MoveControls from '../components/ui/MoveControls.vue'
+import BoardBanner from '../components/ui/BoardBanner.vue'
+import GameOverCard from '../components/ui/GameOverCard.vue'
+import GamePausedCard from '../components/ui/GamePausedCard.vue'
+import MoveHistorySidebar from '../components/ui/MoveHistorySidebar.vue'
 import bagImg from '../assets/bag.svg'
+import { useTheme } from '../composables/useTheme'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,8 +36,10 @@ const {
   reset,
 } = usePendingMove()
 
+const { theme, toggle } = useTheme()
 const code = route.params.code as string
 const submitting = ref(false)
+const historyOpen = ref(false)
 const myRack = computed(() => store.myPlayer?.rack ?? [])
 const myBoard = computed<(string | null)[][]>(() => store.game?.board ?? [])
 
@@ -92,6 +99,7 @@ async function handleSubmit() {
     await store.submitMove(code, payload)
     clearAll()
   } catch (err) {
+    console.error('[Lexi] submit move failed', err)
     store.addToast(err instanceof Error ? err.message : String(err), 'error')
   } finally {
     submitting.value = false
@@ -102,6 +110,7 @@ async function handlePass() {
   try {
     await store.submitMove(code, { type: 'pass' })
   } catch (err) {
+    console.error('[Lexi] pass failed', err)
     store.addToast(err instanceof Error ? err.message : String(err), 'error')
   }
 }
@@ -110,6 +119,7 @@ async function handleForfeit() {
   try {
     await store.forfeit(code)
   } catch (err) {
+    console.error('[Lexi] forfeit failed', err)
     store.addToast(err instanceof Error ? err.message : String(err), 'error')
   }
 }
@@ -137,59 +147,75 @@ function handlePlayAgain() {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col" style="background: var(--color-surface); color: var(--color-on-surface);">
-    <header
-      class="flex items-center justify-between px-6 py-3"
-      style="background: var(--color-surface-container-low); border-bottom: 1px solid var(--color-outline-variant);"
-    >
+  <div class="flex min-h-screen flex-col bg-lexi-bg text-lexi-text">
+    <header class="flex items-center justify-between px-6 py-3 bg-lexi-header border-b-2 border-lexi-header-border">
+      <!-- Game code copy -->
       <button
-        style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-surface-variant); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 0.25rem; transition: background 0.15s;"
-        @mouseenter="(e: any) => { e.currentTarget.style.background = 'var(--color-surface-container)' }"
-        @mouseleave="(e: any) => { e.currentTarget.style.background = 'none' }"
-        @click="copyCode"
+        class="flex items-center gap-1.5 px-2 py-1 font-lexi-ui text-lexi-xs font-bold tracking-lexi-wide text-lexi-text-secondary uppercase cursor-pointer transition-colors duration-lexi-fast hover:text-lexi-text"
         title="Copy room code"
+        @click="copyCode"
       >
         GAME · {{ code }}
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
       </button>
+
       <div class="flex items-center gap-2">
+        <!-- Theme toggle -->
         <button
-          style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-primary); background: var(--color-tertiary-container); border: none; border-radius: 0.25rem; padding: 6px 12px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s;"
-          @mouseenter="(e: any) => { e.target.style.opacity = '0.85' }"
-          @mouseleave="(e: any) => { e.target.style.opacity = '1' }"
+          class="w-8 h-8 flex items-center justify-center text-lexi-text-secondary cursor-pointer transition-colors duration-lexi-fast hover:text-lexi-text"
+          :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+          @click="toggle"
+        >
+          <svg v-if="theme === 'dark'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+
+        <!-- History button -->
+        <button
+          class="px-3 py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-text-secondary border-lexi border-lexi-border-muted shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:text-lexi-text hover:border-lexi-border hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
+          @click="historyOpen = true"
+        >
+          HISTORY
+        </button>
+
+        <!-- Leave button -->
+        <button
+          class="px-3 py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-danger border-lexi border-lexi-danger shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
           @click="handleLeave"
         >
-          Leave
+          LEAVE
         </button>
       </div>
     </header>
 
-    <div class="flex flex-1 flex-col items-center gap-6 p-6 lg:flex-row lg:items-start lg:justify-center" style="padding-bottom: 80px;">
+    <div class="flex flex-1 flex-col items-center gap-6 p-6 pb-20 lg:flex-row lg:items-start lg:justify-center">
       <PlayerPanel
         :player="store.opponent"
         :is-active-turn="!store.isMyTurn && store.phase === 'playing'"
         :connected="store.connected"
+        :avatar-key="store.opponent?.avatar"
         position="top"
       />
 
       <div class="flex flex-col items-center gap-4">
-        <div
-          class="flex items-center gap-1.5 self-end"
-          style="
-            background: rgba(38,38,38,0.4);
-            border-radius: 999px;
-            border: 1px solid rgba(96,96,96,0.3);
-            padding: 4px 12px;
-          "
-        >
-          <img :src="bagImg" style="width: 16px; height: 16px;" alt="bag" />
-          <span style="font-family: var(--font-panel); font-size: 12px; font-weight: 700; color: #d4d4d4;">
+        <div class="flex items-center gap-1.5 self-end px-3 py-1 bg-lexi-bg-sunken border-lexi-light border-lexi-border">
+          <img :src="bagImg" class="w-4 h-4" alt="bag" />
+          <span class="font-lexi-numeric text-lexi-xs font-bold text-lexi-text lexi-numeric">
             {{ store.game?.bag_size ?? 0 }}
           </span>
         </div>
+
+        <BoardBanner />
 
         <GameBoard
           :board="myBoard"
@@ -227,189 +253,32 @@ function handlePlayAgain() {
         :player="store.myPlayer"
         :is-active-turn="store.isMyTurn && store.phase === 'playing'"
         :connected="store.myPlayer?.connected ?? true"
+        :avatar-key="store.session?.avatar"
         position="bottom"
       />
     </div>
 
-    <div
+    <GamePausedCard
       v-if="store.phase === 'paused'"
-      class="fixed inset-0 z-50 flex items-center justify-center"
-      style="background: rgba(19,19,19,0.85);"
-    >
-      <div
-        class="text-center"
-        style="
-          background: var(--color-surface-container-low);
-          border-radius: 0.5rem;
-          border: 1px solid var(--color-outline-variant);
-          box-shadow: var(--shadow-overlay);
-          padding: 32px;
-          max-width: 360px;
-          width: 100%;
-        "
-      >
-        <h2 :style="{
-          fontFamily: 'var(--font-serif)',
-          fontSize: '28px',
-          fontWeight: 600,
-          letterSpacing: '-0.02em',
-          lineHeight: '1.1',
-          color: '#f59e0b',
-        }">
-          GAME PAUSED
-        </h2>
-        <p :style="{
-          fontFamily: 'var(--font-sans)',
-          fontSize: '12px',
-          fontWeight: 700,
-          letterSpacing: '0.1em',
-          marginTop: '12px',
-          color: 'var(--color-on-surface-variant)',
-        }">
-          A player disconnected. Waiting for reconnection…
-        </p>
-        <div v-if="store.game" class="mt-6 space-y-2">
-          <div
-            v-for="(p, i) in store.game.players"
-            :key="i"
-            class="flex items-center justify-between"
-            :style="{
-              background: 'var(--color-surface-container)',
-              borderRadius: '0.375rem',
-              border: '1px solid var(--color-outline-variant)',
-              padding: '10px 14px',
-              opacity: p.connected ? 1 : 0.5,
-            }"
-          >
-            <span style="font-family: var(--font-serif); font-size: 16px; color: var(--color-on-surface);">{{ p.nickname }}</span>
-            <span :style="{
-              fontFamily: 'var(--font-sans)',
-              fontSize: '10px',
-              fontWeight: 700,
-              letterSpacing: '0.1em',
-              color: p.connected ? '#10b981' : '#6b7280',
-            }">
-              {{ p.connected ? 'CONNECTED' : 'DISCONNECTED' }}
-            </span>
-          </div>
-        </div>
-        <button
-          class="w-full mt-6"
-          style="
-            background: linear-gradient(180deg, var(--color-outline), #8a7d7b);
-            color: var(--color-surface-container-lowest);
-            border: none;
-            box-shadow: var(--shadow-button-filled);
-            border-radius: 0.25rem;
-            padding: 12px 24px;
-            font-family: var(--font-sans);
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            cursor: pointer;
-            transition: all 0.2s;
-          "
-          @mouseenter="(e: any) => { e.target.style.opacity = '0.85' }"
-          @mouseleave="(e: any) => { e.target.style.opacity = '1' }"
-          @click="handleLeave"
-        >
-          Leave Game
-        </button>
-      </div>
-    </div>
+      :players="store.game?.players ?? []"
+      @leave="handleLeave"
+    />
 
-    <div
+    <GameOverCard
       v-if="store.phase === 'finished'"
-      class="fixed inset-0 z-50 flex items-center justify-center"
-      style="background: rgba(19,19,19,0.9);"
-    >
-      <div
-        class="text-center"
-        style="
-          background: var(--color-surface-container-low);
-          border-radius: 0.5rem;
-          border: 1px solid var(--color-outline);
-          box-shadow: var(--shadow-overlay);
-          padding: 32px;
-          max-width: 360px;
-          width: 100%;
-        "
-      >
-        <div style="margin-bottom: 6px;">
-          <h2 :style="{
-            fontFamily: 'var(--font-serif)',
-            fontSize: '36px',
-            fontWeight: 600,
-            letterSpacing: '-0.02em',
-            lineHeight: '1.1',
-            color: endReason === 'timeout' ? '#f59e0b' : iAmWinner ? 'var(--color-primary)' : 'var(--color-tertiary)',
-          }">
-            {{ endReason === 'timeout' ? (iAmWinner ? 'YOU WON' : 'TIMED OUT') : (iAmWinner ? 'YOU WON' : 'YOU LOST') }}
-          </h2>
-          <p :style="{
-            fontFamily: 'var(--font-sans)',
-            fontSize: '11px',
-            fontWeight: 700,
-            letterSpacing: '0.12em',
-            marginTop: '4px',
-            color: endReason === 'timeout' ? '#f59e0b' : endReason === 'forfeit' ? 'var(--color-tertiary)' : 'var(--color-on-surface-variant)',
-          }">
-            {{ endReason === 'timeout' ? 'TIME OUT' : endReason === 'forfeit' ? 'FORFEITED' : 'GAME OVER' }}
-          </p>
-        </div>
+      :i-am-winner="iAmWinner"
+      :end-reason="endReason"
+      :winner="winner"
+      :players="store.game?.players ?? []"
+      @play-again="handlePlayAgain"
+    />
 
-        <div v-if="winner" style="margin-bottom: 4px;">
-          <div style="font-family: var(--font-sans); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: var(--color-on-surface-variant); margin-bottom: 2px;">
-            {{ iAmWinner ? 'YOUR SCORE' : 'WINNER' }}
-          </div>
-          <div style="font-family: var(--font-serif); font-size: 22px; font-weight: 500; color: var(--color-primary);">
-            {{ iAmWinner ? '' : winner.nickname + ' · ' }}{{ winner.score }} pts
-          </div>
-        </div>
-
-        <div v-if="store.game" class="space-y-2 mt-6">
-          <div style="font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--color-on-surface-variant);">Final Scores</div>
-          <div class="space-y-2">
-            <div
-              v-for="(p, i) in store.game.players"
-              :key="i"
-              class="flex items-center justify-between"
-              :style="{
-                background: 'var(--color-surface-container)',
-                borderRadius: '0.375rem',
-                border: '1px solid var(--color-outline-variant)',
-                padding: '12px 16px',
-              }"
-            >
-              <span style="font-family: var(--font-serif); font-size: 18px; color: var(--color-on-surface);">{{ p.nickname }}</span>
-              <span style="font-family: var(--font-sans); font-size: 24px; font-weight: 600; color: winner?.id === p.id ? 'var(--color-primary)' : 'var(--color-tertiary)';">{{ p.score }}</span>
-            </div>
-          </div>
-        </div>
-
-        <button
-          class="w-full mt-6"
-          style="
-            background: linear-gradient(180deg, var(--color-outline), #8a7d7b);
-            color: var(--color-surface-container-lowest);
-            border: none;
-            box-shadow: var(--shadow-button-filled);
-            border-radius: 0.25rem;
-            padding: 12px 24px;
-            font-family: var(--font-sans);
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            cursor: pointer;
-            transition: all 0.2s;
-          "
-          @mouseenter="(e: any) => { e.target.style.opacity = '0.85' }"
-          @mouseleave="(e: any) => { e.target.style.opacity = '1' }"
-          @click="handlePlayAgain"
-        >
-          Play Again
-        </button>
-      </div>
-    </div>
+    <MoveHistorySidebar
+      :open="historyOpen"
+      :moves="store.game?.move_history ?? []"
+      :players="store.game?.players ?? []"
+      :my-player-id="store.session?.player_id ?? ''"
+      @close="historyOpen = false"
+    />
   </div>
 </template>

@@ -16,8 +16,6 @@ const emit = defineEmits<{
 
 const shuffleOrder = ref<number[]>([])
 
-// Keyed on tile letters so the order only resets when your actual rack changes,
-// not when an unrelated SSE update delivers a new game object reference.
 const tileSignature = computed(() => props.tiles.map(t => t.letter).join(','))
 
 watch(tileSignature, () => {
@@ -33,106 +31,28 @@ function shuffle() {
   shuffleOrder.value = arr
 }
 
-function tileStyle(originalIndex: number) {
-  const isSelected = props.selectedIndex === originalIndex
-  const isPlaced = props.placedIndices.has(originalIndex)
-  const isSwap = props.swapIndices.has(originalIndex)
-  const swapActive = props.swapMode
-
-  let bg: string
-  let border: string
-  let boxShadow: string
-  let transform: string
-  let color: string
-  let opacity: string
-
-  if (isSwap) {
-    bg = 'linear-gradient(180deg, #2a2a2a, #202020)'
-    border = '1px solid var(--color-primary)'
-    boxShadow = 'var(--shadow-tile-selected)'
-    transform = 'translateY(-3px) scale(1.04)'
-    color = 'var(--color-on-surface-variant)'
-    opacity = '1'
-  } else if (isSelected) {
-    bg = 'linear-gradient(180deg, var(--color-primary), var(--color-primary-fixed-dim))'
-    border = '1px solid var(--color-primary)'
-    boxShadow = 'var(--shadow-tile-selected)'
-    transform = 'translateY(-6px)'
-    color = 'var(--color-on-primary)'
-    opacity = '1'
-  } else if (swapActive) {
-    bg = 'linear-gradient(180deg, var(--color-surface-container-high), var(--color-surface-container))'
-    border = '1px solid var(--color-outline-variant)'
-    boxShadow = 'var(--shadow-tile-default)'
-    transform = 'none'
-    color = 'var(--color-on-surface-variant)'
-    opacity = '1'
-  } else {
-    bg = 'linear-gradient(180deg, var(--color-surface-container-high), var(--color-surface-container))'
-    border = '1px solid var(--color-outline-variant)'
-    boxShadow = 'var(--shadow-tile-default)'
-    transform = 'none'
-    color = 'var(--color-on-surface-variant)'
-    opacity = '1'
-  }
-
-  if (isPlaced && !isSelected) {
-    opacity = '0.35'
-    transform = 'scale(0.9)'
-  }
-
-  return {
-    background: bg,
-    border,
-    boxShadow,
-    transform,
-    color,
-    opacity,
-    position: 'relative' as const,
-    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    cursor: 'pointer',
-    borderRadius: '0.25rem',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '44px',
-    height: '44px',
-  }
-}
-
-function tileHover(originalIndex: number, entering: boolean) {
-  if (props.selectedIndex === originalIndex || props.swapIndices.has(originalIndex) || props.placedIndices.has(originalIndex)) return
-  const el = document.querySelector<HTMLElement>(`[data-rack-index="${originalIndex}"]`)
-  if (!el) return
-  if (entering) {
-    el.style.background = 'linear-gradient(180deg, var(--color-surface-container-highest), var(--color-surface-container-high))'
-    el.style.boxShadow = 'var(--shadow-tile-hover)'
-    el.style.transform = 'translateY(-3px) scale(1.06)'
-  } else {
-    el.style.background = ''
-    el.style.boxShadow = ''
-    el.style.transform = ''
-  }
+function tileStateClass(i: number): string {
+  if (props.placedIndices.has(i) && props.selectedIndex !== i) return 'tile--placed'
+  if (props.swapIndices.has(i)) return 'tile--swap'
+  if (props.selectedIndex === i) return 'tile--selected'
+  return 'tile--normal'
 }
 </script>
 
 <template>
-  <div class="rack-container" style="display: inline-flex; padding: 6px; gap: 6px;">
+  <div class="rack-container inline-flex items-center gap-1.5 px-1.5 py-1.5">
     <template v-if="tiles.length">
       <button
-        v-for="originalIndex in shuffleOrder"
-        :key="originalIndex"
-        :data-rack-index="originalIndex"
-        :style="tileStyle(originalIndex)"
-        @click="emit('selectTile', originalIndex)"
-        @mouseenter="tileHover(originalIndex, true)"
-        @mouseleave="tileHover(originalIndex, false)"
+        v-for="i in shuffleOrder"
+        :key="i"
+        :data-rack-index="i"
+        :class="['tile', 'relative', 'flex', 'flex-col', 'items-center', 'justify-center', 'w-lexi-tile', 'h-lexi-tile', tileStateClass(i)]"
+        @click="emit('selectTile', i)"
       >
-        <span :style="{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, lineHeight: '1', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }">
-          {{ tiles[originalIndex].letter === ' ' ? '?' : tiles[originalIndex].letter }}
+        <span class="tile-letter">
+          {{ tiles[i].letter === ' ' ? '?' : tiles[i].letter }}
         </span>
-        <span class="tile-pts">{{ tiles[originalIndex].points }}</span>
+        <span class="tile-pts">{{ tiles[i].points }}</span>
       </button>
 
       <button class="shuffle-btn" title="Shuffle tiles" @click="shuffle">
@@ -148,8 +68,7 @@ function tileHover(originalIndex: number, entering: boolean) {
 
     <div
       v-else
-      class="flex items-center justify-center"
-      style="width: 176px; height: 44px; font-family: var(--font-sans); font-size: 12px; color: var(--color-on-surface-variant);"
+      class="flex items-center justify-center w-lexi-panel h-lexi-tile font-lexi-ui text-lexi-xs text-lexi-text-muted"
     >
       No tiles
     </div>
@@ -158,21 +77,58 @@ function tileHover(originalIndex: number, entering: boolean) {
 
 <style scoped>
 .rack-container {
-  background: linear-gradient(180deg, var(--color-surface-container-low), var(--color-surface-container));
-  border-radius: var(--radius-panel);
-  border: 1px solid var(--color-outline-variant);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  background: var(--color-tile-rack-bg);
+  border: 2px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
+.tile {
+  background: var(--color-tile-bg);
+  border: 2px solid var(--color-tile-border);
+  color: var(--color-tile-text);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.34, 1.20, 0.64, 1);
+}
+.tile--normal:hover {
+  box-shadow: var(--tile-hover-shadow);
+  transform: var(--tile-hover-translate);
+}
+.tile--selected {
+  background: var(--color-tile-selected-bg);
+  border-color: var(--color-tile-selected-border);
+  color: var(--color-tile-selected-text);
+  box-shadow: var(--tile-selected-shadow);
+  transform: var(--tile-selected-translate);
+}
+.tile--swap {
+  background: var(--color-secondary-subtle);
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+  box-shadow: var(--shadow-sm);
+  transform: translate(-1px, -3px);
+}
+.tile--placed {
+  opacity: 0.35;
+  transform: scale(0.9);
+  cursor: default;
+}
+
+.tile-letter {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+}
 .tile-pts {
   position: absolute;
   bottom: 3px;
   right: 4px;
-  font-family: var(--font-sans);
+  font-family: var(--font-ui);
   font-size: 8px;
   font-weight: 700;
   line-height: 1;
-  opacity: 0.75;
+  opacity: 0.7;
 }
 
 .shuffle-btn {
@@ -182,17 +138,14 @@ function tileHover(originalIndex: number, entering: boolean) {
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid var(--color-outline-variant);
-  border-radius: 0.25rem;
-  color: var(--color-on-surface-variant);
+  border: 1px solid var(--color-border-muted);
+  color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 150ms;
   flex-shrink: 0;
 }
-
 .shuffle-btn:hover {
-  background: var(--color-surface-container-high);
-  border-color: var(--color-outline);
-  color: var(--color-on-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
 }
 </style>

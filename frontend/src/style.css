@@ -1,97 +1,199 @@
+@import './lexi.css';
 @import 'tailwindcss';
 
-/* ─────────────────────────────────────────────
-   Artisan Tabletop — Design Tokens
-   These are the permanent, non-themeable defaults.
-   Multi-theme selection is frozen for launch.
-   ───────────────────────────────────────────── */
+/* ============================================================
+   Tailwind v4: map Lexi tokens → utility classes
+   @theme inline means utilities reference CSS vars at runtime,
+   enabling light/dark switching without rebuilding.
+   ============================================================ */
+@theme inline {
 
-@theme {
-  /* ── Surface palette ─────────────────────── */
-  --color-surface: #131313;
-  --color-surface-dim: #131313;
-  --color-surface-bright: #393939;
-  --color-surface-container-lowest: #0e0e0e;
-  --color-surface-container-low: #1b1c1c;
-  --color-surface-container: #202020;
-  --color-surface-container-high: #2a2a2a;
-  --color-surface-container-highest: #353535;
-  --color-on-surface: #e5e2e1;
-  --color-on-surface-variant: #d3c3c0;
+  /* Surfaces */
+  --color-lexi-bg:          var(--color-bg);
+  --color-lexi-bg-elevated: var(--color-bg-elevated);
+  --color-lexi-bg-sunken:   var(--color-bg-sunken);
 
-  /* ── Primary (brass/walnut) ──────────────── */
-  --color-primary: #e3beb8;
-  --color-on-primary: #422a26;
-  --color-primary-container: #3e2723;
-  --color-primary-fixed-dim: #e3beb8;
+  /* Text */
+  --color-lexi-text:           var(--color-text-primary);
+  --color-lexi-text-secondary: var(--color-text-secondary);
+  --color-lexi-text-muted:     var(--color-text-muted);
+  --color-lexi-text-on-accent: var(--color-text-on-accent);
+  --color-lexi-text-on-dark:   var(--color-text-on-dark);
 
-  /* ── Secondary ───────────────────────────── */
-  --color-secondary: #d6c3bc;
+  /* Brand */
+  --color-lexi-primary:        var(--color-primary);
+  --color-lexi-primary-hover:  var(--color-primary-hover);
+  --color-lexi-primary-subtle: var(--color-primary-subtle);
 
-  /* ── Tertiary (copper/alert) ─────────────── */
-  --color-tertiary: #ffb5a0;
-  --color-tertiary-container: #5a1200;
+  /* Secondary */
+  --color-lexi-secondary:         var(--color-secondary);
+  --color-lexi-secondary-hover:   var(--color-secondary-hover);
+  --color-lexi-secondary-subtle:  var(--color-secondary-subtle);
+  --color-lexi-text-on-secondary: var(--color-text-on-secondary);
 
-  /* ── Outline ─────────────────────────────── */
-  --color-outline: #9c8d8b;
-  --color-outline-variant: #504442;
+  /* Semantic */
+  --color-lexi-danger:         var(--color-danger);
+  --color-lexi-danger-hover:   var(--color-danger-hover);
+  --color-lexi-danger-subtle:  var(--color-danger-subtle);
+  --color-lexi-success:        var(--color-success);
+  --color-lexi-success-subtle: var(--color-success-subtle);
+  --color-lexi-warning:        var(--color-warning);
+  --color-lexi-warning-subtle: var(--color-warning-subtle);
 
-  /* ── Premium squares ─────────────────────── */
-  --color-premium-dl-bg: #1e405a;
-  --color-premium-dl-label: #7ab8d4;
-  --color-premium-tl-bg: #0e2433;
-  --color-premium-tl-label: #5a9ec4;
-  --color-premium-dw-bg: #3e2723;
-  --color-premium-dw-label: #e3beb8;
-  --color-premium-tw-bg: #3d1414;
-  --color-premium-tw-label: #d47a7a;
-  --color-premium-center-bg: #3e2723;
-  --color-premium-center-label: #e3beb8;
+  /* Borders */
+  --color-lexi-border:        var(--color-border);
+  --color-lexi-border-subtle: var(--color-border-subtle);
+  --color-lexi-border-muted:  var(--color-border-muted);
 
-  /* ── Board & Tiles ───────────────────────── */
-  --color-placed-tile-bg: #d4c5a9;
-  --color-placed-tile-letter: #1a1a1a;
-  --color-placed-tile-points: #5a4a3a;
+  /* Rack tiles */
+  --color-lexi-tile:                 var(--color-tile-bg);
+  --color-lexi-tile-border:          var(--color-tile-border);
+  --color-lexi-tile-text:            var(--color-tile-text);
+  --color-lexi-tile-points:          var(--color-tile-points);
+  --color-lexi-tile-selected:        var(--color-tile-selected-bg);
+  --color-lexi-tile-selected-text:   var(--color-tile-selected-text);
+  --color-lexi-tile-selected-border: var(--color-tile-selected-border);
+  --color-lexi-tile-rack:            var(--color-tile-rack-bg);
 
-  /* ── Player panel ────────────────────────── */
-  --color-panel-bg: rgba(38, 38, 38, 0.4);
-  --color-panel-border: rgba(96, 96, 96, 0.3);
-  --color-panel-divider: rgba(96, 96, 96, 0.2);
-  --color-panel-text: #e5e5e5;
-  --color-panel-score: #fff;
-  --color-panel-clock: #a3a3a3;
-  --color-panel-clock-warning: #ffb5a0;
-  --color-panel-micro: #6b7280;
-  --color-active-turn: #10b981;
-  --color-connected: #34d399;
+  /* Player panel */
+  --color-lexi-panel:        var(--color-panel-bg);
+  --color-lexi-panel-border: var(--color-panel-border);
+  --color-lexi-panel-accent: var(--color-panel-active-accent);
+  --color-lexi-score:        var(--color-panel-score);
+  --color-lexi-clock-urgent: var(--color-panel-clock-urgent);
 
-  /* ── Font families ───────────────────────── */
-  --font-serif: 'EB Garamond', serif;
-  --font-sans: 'Work Sans', system-ui, -apple-system, sans-serif;
-  --font-panel: system-ui, -apple-system, sans-serif;
-  --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+  /* Connection dots */
+  --color-lexi-dot-active:  var(--color-dot-active);
+  --color-lexi-dot-waiting: var(--color-dot-waiting);
+  --color-lexi-dot-offline: var(--color-dot-offline);
 
-  /* ── Border-radius ───────────────────────── */
-  --radius-board: 0.625rem;
-  --radius-cell: 0.125rem;
-  --radius-panel: 0.375rem;
-  --radius-pill: 999px;
+  /* Header */
+  --color-lexi-header:        var(--color-header-bg);
+  --color-lexi-header-border: var(--color-header-border);
 
-  /* ── Box shadows ─────────────────────────── */
-  --shadow-board: 0 6px 24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --shadow-cell-inset: inset 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-cell-occupied: 0 2px 6px rgba(0, 0, 0, 0.5);
-  --shadow-tile-default: 0 1px 3px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --shadow-tile-hover: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  --shadow-tile-selected: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 0 0 1px #e3beb8;
-  --shadow-button-filled: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.5);
-  --shadow-overlay: 0 4px 24px rgba(0, 0, 0, 0.6);
+  /* Notification */
+  --color-lexi-notif:      var(--color-notif-bg);
+  --color-lexi-notif-text: var(--color-notif-text);
+
+  /* Board */
+  --color-lexi-board:        var(--color-board-bg);
+  --color-lexi-board-border: var(--color-board-border);
+  --color-lexi-cell:         var(--color-cell-empty-bg);
+  --color-lexi-cell-border:  var(--color-cell-empty-border);
+
+  /* Board squares */
+  --color-lexi-sq-dl:        var(--color-sq-dl-bg);
+  --color-lexi-sq-dl-label:  var(--color-sq-dl-label);
+  --color-lexi-sq-dl-border: var(--color-sq-dl-border);
+  --color-lexi-sq-tl:        var(--color-sq-tl-bg);
+  --color-lexi-sq-tl-label:  var(--color-sq-tl-label);
+  --color-lexi-sq-tl-border: var(--color-sq-tl-border);
+  --color-lexi-sq-dw:        var(--color-sq-dw-bg);
+  --color-lexi-sq-dw-label:  var(--color-sq-dw-label);
+  --color-lexi-sq-dw-border: var(--color-sq-dw-border);
+  --color-lexi-sq-tw:        var(--color-sq-tw-bg);
+  --color-lexi-sq-tw-label:  var(--color-sq-tw-label);
+  --color-lexi-sq-tw-border: var(--color-sq-tw-border);
+  --color-lexi-sq-star:        var(--color-sq-star-bg);
+  --color-lexi-sq-star-label:  var(--color-sq-star-label);
+  --color-lexi-sq-star-border: var(--color-sq-star-border);
+
+  /* Placed tile */
+  --color-lexi-placed:        var(--color-tile-placed-bg);
+  --color-lexi-placed-text:   var(--color-tile-placed-text);
+  --color-lexi-placed-points: var(--color-tile-placed-points);
+  --color-lexi-placed-border: var(--color-tile-placed-border);
+
+  /* Overlays */
+  --color-lexi-overlay:        var(--color-overlay-bg);
+  --color-lexi-overlay-card:   var(--color-overlay-card-bg);
+  --color-lexi-overlay-border: var(--color-overlay-card-border);
+
+  /* Shadows (no-blur offset — the brutalist signature) */
+  --shadow-lexi-sm:            var(--shadow-sm);
+  --shadow-lexi-md:            var(--shadow-md);
+  --shadow-lexi-lg:            var(--shadow-lg);
+  --shadow-lexi-pressed:       var(--shadow-pressed);
+  --shadow-lexi-tile:          var(--shadow-sm);
+  --shadow-lexi-tile-hover:    var(--tile-hover-shadow);
+  --shadow-lexi-tile-selected: var(--tile-selected-shadow);
+
+  /* Border radius */
+  --radius-lexi-xs: 2px;
+  --radius-lexi-sm: 4px;
+
+  /* Fonts */
+  --font-lexi-display: 'EB Garamond', Georgia, serif;
+  --font-lexi-ui:      'Space Mono', 'Courier New', monospace;
+  --font-lexi-numeric: 'Space Mono', monospace;
+
+  /* Font sizes */
+  --text-lexi-xs:   10px;
+  --text-lexi-sm:   12px;
+  --text-lexi-base: 14px;
+  --text-lexi-md:   16px;
+  --text-lexi-lg:   18px;
+  --text-lexi-xl:   24px;
+  --text-lexi-2xl:  32px;
+  --text-lexi-3xl:  48px;
+
+  /* Letter spacing */
+  --tracking-lexi-ui:    0.08em;
+  --tracking-lexi-wide:  0.12em;
+  --tracking-lexi-tight: -0.02em;
+
+  /* Transitions */
+  --duration-lexi-fast:   100ms;
+  --duration-lexi-base:   150ms;
+  --duration-lexi-spring: 200ms;
+  --ease-lexi-spring:     cubic-bezier(0.34, 1.20, 0.64, 1);
+
+  /* Spacing — generates w-lexi-tile, h-lexi-tile, w-lexi-cell, etc. */
+  --spacing-lexi-tile:  44px;
+  --spacing-lexi-cell:  36px;
+  --spacing-lexi-panel: 176px;
 }
 
-/* ── Global body defaults ────────────────── */
+/* Border-width utilities (not auto-generated by v4 @theme) */
+@layer utilities {
+  .border-lexi       { border-width: 2px; }
+  .border-lexi-heavy { border-width: 3px; }
+  .border-lexi-light { border-width: 1px; }
+}
+
+/* ── Compat: aliases for old Artisan Tabletop tokens ─
+   Game components still use these — remove once migrated to Lexi.
+   ─────────────────────────────────────────────────── */
+:root,
+[data-theme="light"],
+[data-theme="dark"] {
+  --color-surface:                    var(--color-bg);
+  --color-surface-dim:                var(--color-bg-sunken);
+  --color-surface-container-lowest:   var(--color-bg-sunken);
+  --color-surface-container-low:      var(--color-bg-elevated);
+  --color-surface-container:          var(--color-bg-elevated);
+  --color-surface-container-high:     var(--color-bg-elevated);
+  --color-on-surface:                 var(--color-text-primary);
+  --color-on-surface-variant:         var(--color-text-secondary);
+  --color-outline:                    var(--color-border);
+  --color-outline-variant:            var(--color-border-muted);
+  --color-on-primary:                 var(--color-text-on-accent);
+  --color-tertiary:                   var(--color-danger);
+  --color-tertiary-container:         var(--color-danger-subtle);
+  --font-serif:                       var(--font-display);
+  --font-sans:                        var(--font-ui);
+  --font-panel:                       var(--font-ui);
+  --shadow-overlay:                   var(--shadow-lg);
+  --shadow-button-filled:             var(--shadow-sm);
+  --shadow-card:                      var(--shadow-sm);
+}
+
+/* ── Base ───────────────────────────────────────── */
 body {
-  background: #131313;
-  color: #e5e2e1;
-  font-family: 'EB Garamond', serif;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  letter-spacing: var(--tracking-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
