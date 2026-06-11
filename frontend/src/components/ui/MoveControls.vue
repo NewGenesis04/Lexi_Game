@@ -5,6 +5,7 @@ const props = defineProps<{
   hasSwaps: boolean
   swapMode: boolean
   loading: boolean
+  bagSize: number
 }>()
 
 const emit = defineEmits<{
@@ -51,7 +52,8 @@ function handleSubmit() {
           ? 'bg-lexi-primary text-lexi-text-on-accent border-lexi-border shadow-lexi-pressed translate-x-0.5 translate-y-0.5'
           : 'bg-transparent text-lexi-text-secondary border-lexi-border-muted hover:border-lexi-border hover:text-lexi-text'
       ]"
-      :disabled="loading || hasPlacements"
+      :disabled="loading || hasPlacements || bagSize === 0"
+      :title="bagSize === 0 ? 'Bag is empty — cannot swap' : ''"
       @click="emit('toggleSwap')"
     >
       {{ swapMode ? 'CANCEL' : 'SWAP' }}

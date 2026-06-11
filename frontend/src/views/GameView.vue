@@ -97,7 +97,7 @@ async function handleSubmit() {
   submitting.value = true
   try {
     await store.submitMove(code, payload)
-    clearAll()
+    reset()
   } catch (err) {
     console.error('[Lexi] submit move failed', err)
     store.addToast(err instanceof Error ? err.message : String(err), 'error')
@@ -241,6 +241,7 @@ function handlePlayAgain() {
           :has-swaps="hasSwapSelection"
           :swap-mode="swapMode"
           :loading="submitting"
+          :bag-size="store.game?.bag_size ?? 0"
           @submit="handleSubmit"
           @clear="clearAll"
           @toggle-swap="toggleSwapMode"

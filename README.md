@@ -23,7 +23,7 @@ Nothing just let you **load a page and play Scrabble**.
 
 ---
 
-I sat on the frustration for a while. And then my brain did what it always does with a bad UX — it started reframing:
+I sat on the frustration for a while. And then my brain did what it always does best — it started reframing:
 
 > This isn't about Scrabble apps.  
 > It's about the absence of a fast, intentional, respectful implementation of a simple turn-based game.
@@ -60,7 +60,7 @@ Three screens, all driven by server state:
 - **Game** — board, rack, controls, two player panels with live clocks and connection dots
 - **Overlay** — game over (win/forfeit/timeout) or game paused (disconnect)
 
-The design system is called **Lexi**. Neo-brutalist. Hard offset shadows, no blur. 2px borders throughout. Space Mono for UI, EB Garamond for display. Two modes — light (cream paper + ink) and dark (near-black + chalk). Toggle whenever.
+The design system is: Neo-brutalist. Hard offset shadows, no blur. 2px borders throughout. Space Mono for UI, EB Garamond for display. Two modes — light (cream paper + ink) and dark (near-black + chalk). Toggle whenever.
 
 ---
 
@@ -122,7 +122,7 @@ I don't know how big this will get. Maybe it stays a personal project I play wit
 | Frontend | Vue 3 + TypeScript | Reactive by design, perfect for full-state pushes |
 | Styling | TailwindCSS v4 + Lexi CSS | Design tokens in CSS vars, utility classes at compile time |
 | Build | Vite 6 | Instant HMR, Rust-powered bundling |
-| Monorepo | uv workspaces | Single `pip install`, clean boundaries |
+| Monorepo | uv workspaces | Single `uv sync`, clean boundaries |
 | Deploy | Docker + VPS | Single container, trivial rollback |
 
 ### Project Layout

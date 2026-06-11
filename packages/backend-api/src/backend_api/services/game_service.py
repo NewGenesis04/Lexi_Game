@@ -530,9 +530,9 @@ class GameService:
         tokens = sse_manager.tokens_for_game(state.code)
         payloads: dict[str, str] = {}
         for token in tokens:
-            session = await self._repo.load_session(token)
-            if session is None:
+            pid = sse_manager.player_id_for_token(token)
+            if pid is None:
                 continue
-            view = self._to_view(state, viewer_id=session.player_id)
+            view = self._to_view(state, viewer_id=pid)
             payloads[token] = json.dumps(view.model_dump(mode="json"))
         await sse_manager.broadcast(payloads)

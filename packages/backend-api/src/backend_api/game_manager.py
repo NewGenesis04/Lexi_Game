@@ -43,7 +43,7 @@ def add_connection(code: str, player_id: str, token: str) -> None:
     _connections.setdefault(code, {}).setdefault(player_id, set()).add(token)
 
 
-def remove_connection(code: str, player_id: str, token: str) -> None:
+def remove_connection(code: str, player_id: str, token: str) -> bool:
     """Remove one SSE connection for a player. Returns True if player has no more connections."""
     conns = _connections.get(code, {}).get(player_id)
     if conns is not None:

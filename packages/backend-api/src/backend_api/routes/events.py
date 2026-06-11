@@ -57,7 +57,7 @@ async def _event_generator(
         )
         yield f"data: {json.dumps(view.model_dump(mode='json'))}\n\n"
 
-    queue = sse_manager.subscribe(code, token)
+    queue = sse_manager.subscribe(code, token, session.player_id)
     try:
         while True:
             get_task = asyncio.create_task(queue.get())
