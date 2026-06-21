@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type {
   Dictionary,
   GamePhase,
@@ -18,8 +18,21 @@ import {
 import { connectSSE, type SSEConnection } from '../composables/sse'
 
 export const useGameStore = defineStore('game', () => {
+  const saved = localStorage.getItem('lexi_session')
+  let initialSession: PlayerSession | null = null
+  if (saved) {
+    try { initialSession = JSON.parse(saved) } catch { /* corrupt data */ }
+  }
   const game = ref<GameStateOut | null>(null)
-  const session = ref<PlayerSession | null>(null)
+  const session = ref<PlayerSession | null>(initialSession)
+
+  watch(session, (val) => {
+    if (val) {
+      localStorage.setItem('lexi_session', JSON.stringify(val))
+    } else {
+      localStorage.removeItem('lexi_session')
+    }
+  })
   const connected = ref(false)
   const toasts = ref<ToastMessage[]>([])
   let sseConnection: SSEConnection | null = null
@@ -137,9 +150,17 @@ export const useGameStore = defineStore('game', () => {
       addToast('Cannot connect: no session', 'error')
       return
     }
-    const url = `${import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'}/events?token=${session.value.token}`
+    // Reset overtime baseline so reconnection re-detects first-strike OT
+    previousOvertimeCounts = {}
+    const url = `${import.meta.env.VITE_API_BASE ?? ''}/events?token=${session.value.token}`
     sseConnection = connectSSE(url, (data) => {
-      updateLocalState(data as GameStateOut)
+      const msg = data as Record<string, unknown>
+      if (msg.type === 'notification') {
+        const p = msg.payload as { text: string; type: string }
+        addToast(p.text, (p.type as ToastMessage['type']) ?? 'error')
+      } else {
+        updateLocalState(data as GameStateOut)
+      }
     })
     connected.value = true
   }

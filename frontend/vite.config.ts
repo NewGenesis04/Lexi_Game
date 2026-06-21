@@ -5,4 +5,11 @@ import VueDevTools from 'vite-plugin-vue-devtools'
 
 export default defineConfig({
   plugins: [vue(), tailwindcss(), VueDevTools()],
+  server: {
+    host: true,
+    proxy: {
+      '/games': 'http://localhost:8000',
+      '/events': 'http://localhost:8000',
+    },
+  },
 })

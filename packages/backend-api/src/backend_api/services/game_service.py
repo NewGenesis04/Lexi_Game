@@ -13,16 +13,16 @@ from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
-from game_engine import bag as bag_module, board as board_module, scoring
-from game_engine import dictionary as dict_module
-from game_engine.models import (
+from game_engine import bag as bag_module, board as board_module, scoring  # noqa: E402
+from game_engine import dictionary as dict_module # noqa: E402
+from game_engine.models import ( # noqa: E402
     Dictionary, GamePhase, GameState, Move, MoveType, PlacedTile, Player, Tile,
-)
+) 
 
-from backend_api import game_manager, sse_manager
-from backend_api.repositories.game_repo import GameRepo
-from backend_api.schemas import CreateGameOut, GameStateOut, JoinGameOut
-from backend_api.session import PlayerSession, generate_token
+from backend_api import game_manager, sse_manager # noqa: E402
+from backend_api.repositories.game_repo import GameRepo # noqa: E402
+from backend_api.schemas import CreateGameOut, GameStateOut, JoinGameOut # noqa: E402
+from backend_api.session import PlayerSession, generate_token # noqa: E402
 
 
 def _generate_code() -> str:
@@ -117,18 +117,23 @@ class GameService:
     async def place_tiles(
         self, code: str, player_id: str, placed: list[PlacedTile]
     ) -> GameStateOut:
+        payloads: dict[str, str] | None = None
         async with game_manager.get_lock(code):
             state = await self._load_or_404(code)
             self._assert_turn(state, player_id)
 
-            if not board_module.validate_placement(state, placed):
-                raise HTTPException(status_code=422, detail="Invalid placement")
+            try:
+                if not board_module.validate_placement(state, placed):
+                    raise HTTPException(status_code=422, detail="Invalid placement")
 
-            new_board = board_module.apply_placement(state.board, placed)
-            formed = board_module.formed_words(new_board, placed)
-            for word in formed:
-                if not dict_module.is_valid_word(word, state.dictionary):
-                    raise HTTPException(status_code=422, detail=f"{word} is not a valid word")
+                new_board = board_module.apply_placement(state.board, placed)
+                formed = board_module.formed_words(new_board, placed)
+                for word in formed:
+                    if not dict_module.is_valid_word(word, state.dictionary):
+                        raise HTTPException(status_code=422, detail=f"{word} is not a valid word")
+            except HTTPException:
+                await self._broadcast_notification(code, player_id, "Opponent made an invalid move")
+                raise
 
             points = scoring.score_placement(state.board, placed)
             state.board = new_board
@@ -166,14 +171,17 @@ class GameService:
 
             self._advance_turn(state)
             await self._repo.save_game(state)
+            payloads = await self._serialize_game(state)
             self._start_timer(state)
-            await self._broadcast(state)
 
+        if payloads:
+            await sse_manager.broadcast(payloads)
         return self._to_view(state, viewer_id=player_id)
 
     async def swap_tiles(
         self, code: str, player_id: str, letters: list[str]
     ) -> GameStateOut:
+        payloads: dict[str, str] | None = None
         async with game_manager.get_lock(code):
             state = await self._load_or_404(code)
             self._assert_turn(state, player_id)
@@ -205,12 +213,15 @@ class GameService:
 
             self._advance_turn(state)
             await self._repo.save_game(state)
+            payloads = await self._serialize_game(state)
             self._start_timer(state)
-            await self._broadcast(state)
 
+        if payloads:
+            await sse_manager.broadcast(payloads)
         return self._to_view(state, viewer_id=player_id)
 
     async def pass_turn(self, code: str, player_id: str) -> GameStateOut:
+        payloads: dict[str, str] | None = None
         async with game_manager.get_lock(code):
             state = await self._load_or_404(code)
             self._assert_turn(state, player_id)
@@ -235,12 +246,15 @@ class GameService:
 
             self._advance_turn(state)
             await self._repo.save_game(state)
+            payloads = await self._serialize_game(state)
             self._start_timer(state)
-            await self._broadcast(state)
 
+        if payloads:
+            await sse_manager.broadcast(payloads)
         return self._to_view(state, viewer_id=player_id)
 
     async def forfeit(self, code: str, player_id: str) -> GameStateOut:
+        payloads: dict[str, str] | None = None
         async with game_manager.get_lock(code):
             game_manager.clear_turn_started(code)
             state = await self._load_or_404(code)
@@ -251,9 +265,11 @@ class GameService:
             state.last_move = move
             state.move_history.append(move)
             await self._repo.save_game(state)
-            await self._broadcast(state)
+            payloads = await self._serialize_game(state)
             game_manager.remove_game(code)
 
+        if payloads:
+            await sse_manager.broadcast(payloads)
         return self._to_view(state, viewer_id=player_id)
 
     # -----------------------------------------------------------------------
@@ -536,3 +552,32 @@ class GameService:
             view = self._to_view(state, viewer_id=pid)
             payloads[token] = json.dumps(view.model_dump(mode="json"))
         await sse_manager.broadcast(payloads)
+
+    async def _serialize_game(self, state: GameState) -> dict[str, str]:
+        """Serialise game state once per connected player. Returns {token: json_string}.
+        Call inside the lock; pass result to sse_manager.broadcast() outside the lock."""
+        tokens = sse_manager.tokens_for_game(state.code)
+        payloads: dict[str, str] = {}
+        for token in tokens:
+            pid = sse_manager.player_id_for_token(token)
+            if pid is None:
+                continue
+            view = self._to_view(state, viewer_id=pid)
+            payloads[token] = json.dumps(view.model_dump(mode="json"))
+        return payloads
+
+    async def _broadcast_notification(
+        self, game_code: str, skip_player_id: str, text: str, notif_type: str = "error",
+    ) -> None:
+        """Send a notification SSE event to all connected players except skip_player_id."""
+        tokens = sse_manager.tokens_for_game(game_code)
+        payloads: dict[str, str] = {}
+        for token in tokens:
+            pid = sse_manager.player_id_for_token(token)
+            if pid is None or pid == skip_player_id:
+                continue
+            payloads[token] = json.dumps(
+                {"type": "notification", "payload": {"text": text, "type": notif_type}},
+            )
+        if payloads:
+            await sse_manager.broadcast(payloads)
