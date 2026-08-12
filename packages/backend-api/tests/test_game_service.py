@@ -6,7 +6,9 @@ from fastapi import HTTPException
 from game_engine.models import (  # type: ignore
     Dictionary, GamePhase, GameState, MoveType, Player, PlacedTile, Tile,
 )
-from backend_api import game_manager
+from game_engine import PassRequest, PlaceRequest, SwapRequest, Turn
+from backend_api import game_manager, sse_manager, turn_clock
+from backend_api.connection_lifecycle import lifecycle
 from backend_api.services.game_service import GameService  # type: ignore
 
 
@@ -71,8 +73,9 @@ def mock_side_effects():
         patch("backend_api.game_manager.set_timer"),
         patch("backend_api.game_manager.cancel_timer"),
         patch("backend_api.game_manager.remove_game"),
-        patch("backend_api.game_manager.set_pause_timer"),
-        patch("backend_api.game_manager.cancel_pause_timer"),
+        patch("backend_api.connection_lifecycle.lifecycle.remove_game"),
+        patch("backend_api.connection_lifecycle.lifecycle.set_pause_timer"),
+        patch("backend_api.connection_lifecycle.lifecycle.cancel_pause_timer"),
         patch("backend_api.sse_manager.broadcast", new_callable=AsyncMock),
     ):
         yield
@@ -80,8 +83,10 @@ def mock_side_effects():
 
 @pytest.fixture(autouse=True)
 def clear_game_manager():
-    game_manager._connections.clear()
-    game_manager._pending_disconnects.clear()
+    lifecycle._connections.clear()
+    lifecycle._pending_disconnects.clear()
+    turn_clock.clock.clear("ABCD12")
+    turn_clock.clock.clear("ABCD99")
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +129,21 @@ async def test_join_game_starts_playing(repo, svc):
     assert j.player_id != c.player_id
 
 
+async def test_join_game_broadcasts_to_the_waiting_creator(repo, svc):
+    """Regression: join_game used to only return the state to the joiner —
+    a creator already sitting on an SSE connection never learned someone
+    joined until they refreshed."""
+    c = await svc.create_game("Alice", Dictionary.TWL06, 180.0)
+    sse_manager.subscribe(c.code, "tok-alice", c.player_id)
+    try:
+        with patch("backend_api.sse_manager.broadcast", new_callable=AsyncMock) as mock_broadcast:
+            await svc.join_game(c.code, "Bob")
+        payloads = mock_broadcast.call_args.args[0]
+        assert "tok-alice" in payloads
+    finally:
+        sse_manager.unsubscribe(c.code, "tok-alice")
+
+
 async def test_join_game_not_found(svc):
     with pytest.raises(HTTPException) as exc:
         await svc.join_game("ZZZZZZ", "Bob")
@@ -153,7 +173,7 @@ async def test_get_game_sanitizes_opponent_rack(repo, svc):
 
 
 # ---------------------------------------------------------------------------
-# place_tiles
+# apply_move — place
 # ---------------------------------------------------------------------------
 
 async def test_place_tiles_updates_board_and_score(repo, svc):
@@ -163,7 +183,7 @@ async def test_place_tiles_updates_board_and_score(repo, svc):
         PlacedTile(row=7, col=8, letter="A"),
         PlacedTile(row=7, col=9, letter="T"),
     ]
-    await svc.place_tiles("ABCD12", "p1", tiles)
+    await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
     s = await repo.load_game("ABCD12")
     assert s.board[7][7] == "C"
     assert s.board[7][8] == "A"
@@ -176,7 +196,7 @@ async def test_place_tiles_updates_board_and_score(repo, svc):
 async def test_place_tiles_invalid_placement_raises_422(repo, svc):
     await repo.save_game(_state())
     with pytest.raises(HTTPException) as exc:
-        await svc.place_tiles("ABCD12", "p1", [PlacedTile(row=0, col=0, letter="C")])
+        await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=[PlacedTile(row=0, col=0, letter="C")]))
     assert exc.value.status_code == 422
 
 
@@ -187,14 +207,14 @@ async def test_place_tiles_invalid_word_raises_422(repo, svc):
         PlacedTile(row=7, col=8, letter="Z"),
     ]
     with pytest.raises(HTTPException) as exc:
-        await svc.place_tiles("ABCD12", "p1", tiles)
+        await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
     assert exc.value.status_code == 422
 
 
 async def test_place_tiles_wrong_player_raises_403(repo, svc):
     await repo.save_game(_state())
     with pytest.raises(HTTPException) as exc:
-        await svc.place_tiles("ABCD12", "p2", [PlacedTile(row=7, col=7, letter="A")])
+        await svc.apply_move("ABCD12", "p2", PlaceRequest(player_id="p2", tiles=[PlacedTile(row=7, col=7, letter="A")]))
     assert exc.value.status_code == 403
 
 
@@ -207,18 +227,18 @@ async def test_place_tiles_empties_rack_ends_game(repo, svc):
         PlacedTile(row=7, col=8, letter="A"),
         PlacedTile(row=7, col=9, letter="T"),
     ]
-    await svc.place_tiles("ABCD12", "p1", tiles)
+    await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED
 
 
 # ---------------------------------------------------------------------------
-# swap_tiles
+# apply_move — swap
 # ---------------------------------------------------------------------------
 
 async def test_swap_tiles_refreshes_rack(repo, svc):
     await repo.save_game(_state())
-    await svc.swap_tiles("ABCD12", "p1", ["C", "A", "T"])
+    await svc.apply_move("ABCD12", "p1", SwapRequest(player_id="p1", letters=["C", "A", "T"]))
     s = await repo.load_game("ABCD12")
     assert len(s.players[0].rack) == 7
     assert s.current_player_index == 1
@@ -230,17 +250,17 @@ async def test_swap_tiles_insufficient_bag_raises_422(repo, svc):
     state.bag = [Tile(letter="A", points=1)] * 2  # only 2 tiles, trying to swap 3
     await repo.save_game(state)
     with pytest.raises(HTTPException) as exc:
-        await svc.swap_tiles("ABCD12", "p1", ["C", "A", "T"])
+        await svc.apply_move("ABCD12", "p1", SwapRequest(player_id="p1", letters=["C", "A", "T"]))
     assert exc.value.status_code == 422
 
 
 # ---------------------------------------------------------------------------
-# pass_turn
+# apply_move — pass
 # ---------------------------------------------------------------------------
 
 async def test_pass_turn_increments_counter(repo, svc):
     await repo.save_game(_state())
-    await svc.pass_turn("ABCD12", "p1")
+    await svc.apply_move("ABCD12", "p1", PassRequest(player_id="p1"))
     s = await repo.load_game("ABCD12")
     assert s.consecutive_passes == 1
     assert s.current_player_index == 1
@@ -250,7 +270,7 @@ async def test_six_passes_ends_game(repo, svc):
     state = _state()
     state.consecutive_passes = 5
     await repo.save_game(state)
-    await svc.pass_turn("ABCD12", "p1")
+    await svc.apply_move("ABCD12", "p1", PassRequest(player_id="p1"))
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED
 
@@ -262,10 +282,10 @@ async def test_six_passes_ends_game(repo, svc):
 async def test_connect_player_marks_connected(repo, svc):
     state = _state()
     await repo.save_game(state)
-    assert game_manager.is_player_connected("ABCD12", "p1") is False
+    assert lifecycle.is_player_connected("ABCD12", "p1") is False
     await svc.connect_player("ABCD12", "p1", "tok1")
-    assert game_manager.is_player_connected("ABCD12", "p1") is True
-    assert game_manager.is_player_connected("ABCD12", "p2") is False
+    assert lifecycle.is_player_connected("ABCD12", "p1") is True
+    assert lifecycle.is_player_connected("ABCD12", "p2") is False
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PLAYING
 
@@ -277,12 +297,12 @@ async def test_connect_player_resumes_when_both_connected(repo, svc):
     state.paused_at = 1000.0
     state.players[0].time_remaining_secs = 90.0
     await repo.save_game(state)
-    game_manager.add_connection("ABCD12", "p1", "tok_p1")
+    lifecycle.add_connection("ABCD12", "p1", "tok_p1")
     await svc.connect_player("ABCD12", "p2", "tok2")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PLAYING
-    assert game_manager.is_player_connected("ABCD12", "p1") is True
-    assert game_manager.is_player_connected("ABCD12", "p2") is True
+    assert lifecycle.is_player_connected("ABCD12", "p1") is True
+    assert lifecycle.is_player_connected("ABCD12", "p2") is True
     assert s.players[0].time_remaining_secs == 90.0  # restored from paused_time_left
     assert s.paused_time_left is None
     assert s.paused_at is None
@@ -295,8 +315,8 @@ async def test_connect_player_stays_paused_if_other_offline(repo, svc):
     await svc.connect_player("ABCD12", "p1", "tok1")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PAUSED
-    assert game_manager.is_player_connected("ABCD12", "p1") is True
-    assert game_manager.is_player_connected("ABCD12", "p2") is False
+    assert lifecycle.is_player_connected("ABCD12", "p1") is True
+    assert lifecycle.is_player_connected("ABCD12", "p2") is False
 
 
 async def test_connect_player_does_nothing_for_created(repo, svc):
@@ -320,19 +340,19 @@ async def test_connect_player_does_nothing_for_finished(repo, svc):
 async def test_disconnect_player_pauses_playing_game(repo, svc):
     state = _state()
     await repo.save_game(state)
-    game_manager.add_connection("ABCD12", "p1", "tok_p1")
-    game_manager.add_connection("ABCD12", "p2", "tok_p2")
+    lifecycle.add_connection("ABCD12", "p1", "tok_p1")
+    lifecycle.add_connection("ABCD12", "p2", "tok_p2")
     with (
-        patch("backend_api.game_manager.get_elapsed", return_value=5.0),
-        patch("backend_api.game_manager.set_pause_timer"),
+        patch("backend_api.turn_clock.clock.elapsed", return_value=5.0),
+        patch("backend_api.connection_lifecycle.lifecycle.set_pause_timer"),
     ):
         await svc.disconnect_player("ABCD12", "p1", "tok_p1")
         # Grace timer was scheduled; fire it manually to check the pause logic
-        await svc._pause_after_grace("ABCD12", "p1", grace_secs=0)
+        await lifecycle._pause_after_grace("ABCD12", "p1", repo, grace_secs=0)
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PAUSED
-    assert game_manager.is_player_connected("ABCD12", "p1") is False
-    assert game_manager.is_player_connected("ABCD12", "p2") is True
+    assert lifecycle.is_player_connected("ABCD12", "p1") is False
+    assert lifecycle.is_player_connected("ABCD12", "p2") is True
     assert s.paused_time_left is not None
     assert s.paused_at is not None
     assert s.paused_time_left == 175.0  # 180 - 5 elapsed
@@ -368,7 +388,7 @@ async def test_disconnect_player_does_not_pause_if_player_never_connected(repo, 
     await svc.disconnect_player("ABCD12", "p1", "tok1")
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PLAYING  # must NOT be PAUSED
-    assert game_manager.is_player_connected("ABCD12", "p1") is False
+    assert lifecycle.is_player_connected("ABCD12", "p1") is False
 
 
 async def test_disconnect_player_unknown_player_is_noop(repo, svc):
@@ -383,11 +403,10 @@ async def test_pause_game_freezes_clock_for_active_player(repo, svc):
     state = _state()
     state.current_player_index = 0  # Alice is active
     await repo.save_game(state)
-    game_manager.set_turn_started("ABCD12")
-    elapsed = game_manager.get_elapsed("ABCD12")
-    svc._pause_game(state)
+    with patch("backend_api.turn_clock.clock.elapsed", return_value=5.0):
+        lifecycle.pause(state)
     assert state.phase == GamePhase.PAUSED
-    assert state.paused_time_left == pytest.approx(180.0 - elapsed, abs=2.0)
+    assert state.paused_time_left == 175.0
     assert state.paused_at is not None
 
 
@@ -396,10 +415,7 @@ async def test_resume_game_restores_clock(repo, svc):
     state.phase = GamePhase.PAUSED
     state.paused_time_left = 90.0
     state.paused_at = 1000.0
-    with patch("backend_api.game_manager.cancel_pause_timer"), \
-         patch("backend_api.game_manager.set_turn_started"), \
-         patch("asyncio.create_task"):
-        svc._resume_game(state)
+    lifecycle.resume(state)
     assert state.phase == GamePhase.PLAYING
     assert state.players[0].time_remaining_secs == 90.0
     assert state.paused_time_left is None
@@ -410,8 +426,8 @@ async def test_disconnect_grace_task_forfeit_when_one_player_connected(repo, svc
     state = _state()
     state.phase = GamePhase.PAUSED
     await repo.save_game(state)
-    game_manager.add_connection("ABCD12", "p1", "tok_p1")
-    await svc._disconnect_grace_task("ABCD12", grace_secs=0.001)
+    lifecycle.add_connection("ABCD12", "p1", "tok_p1")
+    await lifecycle._disconnect_grace_task("ABCD12", repo, grace_secs=0.001)
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED
     assert s.last_move.type == MoveType.TIMEOUT
@@ -422,7 +438,7 @@ async def test_disconnect_grace_task_both_offline_stays_paused(repo, svc):
     state = _state()
     state.phase = GamePhase.PAUSED
     await repo.save_game(state)
-    await svc._disconnect_grace_task("ABCD12", grace_secs=0.001)
+    await lifecycle._disconnect_grace_task("ABCD12", repo, grace_secs=0.001)
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PAUSED  # stays paused for GC
 
@@ -431,14 +447,14 @@ async def test_disconnect_grace_task_no_op_if_game_resumed(repo, svc):
     state = _state()
     state.phase = GamePhase.PLAYING  # game was resumed
     await repo.save_game(state)
-    await svc._disconnect_grace_task("ABCD12", grace_secs=0.001)
+    await lifecycle._disconnect_grace_task("ABCD12", repo, grace_secs=0.001)
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PLAYING  # no change
 
 
 async def test_disconnect_grace_task_no_op_if_game_deleted(repo, svc):
     # No game saved — task should not crash
-    await svc._disconnect_grace_task("ABCD12", grace_secs=0.001)
+    await lifecycle._disconnect_grace_task("ABCD12", repo, grace_secs=0.001)
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +470,7 @@ async def test_forfeit_ends_game(repo, svc):
 
 
 # ---------------------------------------------------------------------------
-# time deduction (_deduct_time)
+# time deduction (engine apply_elapsed via apply_move)
 # ---------------------------------------------------------------------------
 
 async def test_deduct_time_subtracts_from_active_player(repo, svc):
@@ -464,8 +480,8 @@ async def test_deduct_time_subtracts_from_active_player(repo, svc):
         PlacedTile(row=7, col=8, letter="A"),
         PlacedTile(row=7, col=9, letter="T"),
     ]
-    with patch("backend_api.game_manager.get_elapsed", return_value=5.0):
-        await svc.place_tiles("ABCD12", "p1", tiles)
+    with patch("backend_api.turn_clock.clock.elapsed", return_value=5.0):
+        await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
     s = await repo.load_game("ABCD12")
     assert s.players[0].time_remaining_secs == pytest.approx(175.0, abs=0.01)
     assert s.players[1].time_remaining_secs == 180.0
@@ -479,21 +495,75 @@ async def test_deduct_time_floor_at_zero(repo, svc):
         PlacedTile(row=7, col=8, letter="A"),
         PlacedTile(row=7, col=9, letter="T"),
     ]
-    with patch("backend_api.game_manager.get_elapsed", return_value=999.0):
-        await svc.place_tiles("ABCD12", "p1", tiles)
+    with patch("backend_api.turn_clock.clock.elapsed", return_value=999.0):
+        await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
     s = await repo.load_game("ABCD12")
     assert s.players[0].time_remaining_secs == 60.0
     assert s.players[0].overtime_count == 1
 
 
-async def test_deduct_time_clears_turn_started(repo, svc):
+async def test_apply_move_clears_turn_started(repo, svc):
     await repo.save_game(_state())
-    game_manager.set_turn_started("ABCD12")
+    turn_clock.clock.mark_turn_started("ABCD12")
     tiles = [PlacedTile(row=7, col=7, letter="C")]
     with patch("backend_api.services.game_service.bag_module.draw_tiles") as mock_draw:
         mock_draw.return_value = ([], [])
-        await svc.place_tiles("ABCD12", "p1", tiles)
-    assert game_manager.get_elapsed("ABCD12") < 1.0  # was reset, so elapsed is near-zero
+        await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
+    assert turn_clock.clock.elapsed("ABCD12") < 1.0  # was reset, so elapsed is near-zero
+
+
+async def test_rejected_move_still_deducts_and_persists_time(repo, svc):
+    """Regression: an invalid move used to skip the clock deduction entirely,
+    leaving the player's bank artificially high after any rejected attempt."""
+    await repo.save_game(_state())
+    with patch("backend_api.turn_clock.clock.elapsed", return_value=5.0):
+        with pytest.raises(HTTPException):
+            await svc.apply_move(
+                "ABCD12", "p1", PlaceRequest(player_id="p1", tiles=[PlacedTile(row=0, col=0, letter="C")]),
+            )
+    s = await repo.load_game("ABCD12")
+    assert s.players[0].time_remaining_secs == pytest.approx(175.0, abs=0.01)
+
+
+async def test_rejected_move_reanchors_clock_instead_of_losing_elapsed_time(repo, svc):
+    """Regression: clearing (rather than re-anchoring) the clock after a
+    rejected move made every subsequent elapsed() read ~0 until the next
+    successful move, silently losing all the real time spent in between."""
+    await repo.save_game(_state())
+    with patch("backend_api.turn_clock.clock.elapsed", return_value=5.0):
+        with pytest.raises(HTTPException):
+            await svc.apply_move(
+                "ABCD12", "p1", PlaceRequest(player_id="p1", tiles=[PlacedTile(row=0, col=0, letter="C")]),
+            )
+
+    tiles = [PlacedTile(row=7, col=7, letter="C"), PlacedTile(row=7, col=8, letter="A"), PlacedTile(row=7, col=9, letter="T")]
+    with patch("backend_api.turn_clock.clock.elapsed", return_value=3.0):
+        await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
+    s = await repo.load_game("ABCD12")
+    assert s.players[0].time_remaining_secs == pytest.approx(172.0, abs=0.01)  # 180 - 5 - 3
+
+
+async def test_invalid_word_error_names_the_word(repo, svc):
+    await repo.save_game(_state(p1_letters="XXXZZZQ"))
+    tiles = [PlacedTile(row=7, col=7, letter="X"), PlacedTile(row=7, col=8, letter="Z")]
+    with pytest.raises(HTTPException) as exc:
+        await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
+    assert exc.value.status_code == 422
+    assert "XZ" in exc.value.detail
+
+
+async def test_invalid_word_notifies_opponent_with_the_word(repo, svc):
+    await repo.save_game(_state(p1_letters="XXXZZZQ"))
+    sse_manager.subscribe("ABCD12", "tok-p2", "p2")
+    try:
+        tiles = [PlacedTile(row=7, col=7, letter="X"), PlacedTile(row=7, col=8, letter="Z")]
+        with patch("backend_api.sse_manager.broadcast", new_callable=AsyncMock) as mock_broadcast:
+            with pytest.raises(HTTPException):
+                await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
+        payloads = mock_broadcast.call_args.args[0]
+        assert "XZ" in payloads["tok-p2"]
+    finally:
+        sse_manager.unsubscribe("ABCD12", "tok-p2")
 
 
 # ---------------------------------------------------------------------------
@@ -503,8 +573,9 @@ async def test_deduct_time_clears_turn_started(repo, svc):
 async def test_overtime_first_timeout_penalty(repo, svc):
     """1st timeout: -10 points, reset to 60s, overtime_count=1."""
     await repo.save_game(_state())
-    with patch("asyncio.create_task") as mock_ct:
-        await svc._time_bank_task("ABCD12", "p1", 0.001)
+    with patch("asyncio.sleep", new=AsyncMock()), \
+         patch("asyncio.create_task") as mock_ct:
+        await svc._time_bank_task("ABCD12", "p1", 180.0)
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.PLAYING
     assert s.players[0].score == -10
@@ -513,13 +584,33 @@ async def test_overtime_first_timeout_penalty(repo, svc):
     mock_ct.assert_called_once()
 
 
-async def test_overtime_second_timeout_forfeit(repo, svc):
-    """2nd timeout: forfeit the player."""
+async def test_overtime_second_timeout_grant(repo, svc):
+    """2nd timeout still grants overtime (-10, +60s); forfeit only on the 4th."""
     state = _state()
+    state.players[0].score = -10
     state.players[0].overtime_count = 1
     state.players[0].time_remaining_secs = 60.0
     await repo.save_game(state)
-    await svc._time_bank_task("ABCD12", "p1", 0.001)
+    with patch("asyncio.sleep", new=AsyncMock()), \
+         patch("asyncio.create_task") as mock_ct:
+        await svc._time_bank_task("ABCD12", "p1", 60.0)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+    assert s.players[0].score == -20
+    assert s.players[0].time_remaining_secs == 60.0
+    assert s.players[0].overtime_count == 2
+    mock_ct.assert_called_once()
+
+
+async def test_overtime_fourth_timeout_forfeit(repo, svc):
+    """4th timeout (3 OT already used): forfeit the player."""
+    state = _state()
+    state.players[0].score = -30
+    state.players[0].overtime_count = 3
+    state.players[0].time_remaining_secs = 60.0
+    await repo.save_game(state)
+    with patch("asyncio.sleep", new=AsyncMock()):
+        await svc._time_bank_task("ABCD12", "p1", 60.0)
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED
     assert s.players[0].time_remaining_secs == 0.0

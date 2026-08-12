@@ -7,13 +7,16 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from backend_api import game_manager, sse_manager
+from backend_api import sse_manager
+from backend_api.connection_lifecycle import lifecycle
 from backend_api.repositories.game_repo import GameRepo
 from backend_api.schemas import GameStateOut
 from backend_api.services.game_service import GameService
 from backend_api.session import PlayerSession
 
 router = APIRouter(tags=["events"])
+
+_KEEPALIVE_INTERVAL = 15.0
 
 
 def _get_repo(request: Request) -> GameRepo:
@@ -53,29 +56,21 @@ async def _event_generator(
         view = GameStateOut.from_domain(
             state,
             viewer_id=session.player_id,
-            connected_map=game_manager.get_connected(code),
+            connected_map=lifecycle.connected_map(code),
         )
         yield f"data: {json.dumps(view.model_dump(mode='json'))}\n\n"
 
     queue = sse_manager.subscribe(code, token, session.player_id)
     try:
         while True:
-            get_task = asyncio.create_task(queue.get())
-            dc_task = asyncio.create_task(request.is_disconnected())
-            done, pending = await asyncio.wait(
-                {get_task, dc_task},
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            for t in pending:
-                t.cancel()
-                try:
-                    await t
-                except asyncio.CancelledError:
-                    pass
-            if dc_task in done:
-                break
-            if get_task in done:
-                yield f"data: {get_task.result()}\n\n"
+            try:
+                payload = await asyncio.wait_for(queue.get(), timeout=_KEEPALIVE_INTERVAL)
+            except asyncio.TimeoutError:
+                if await request.is_disconnected():
+                    break
+                yield ": keepalive\n\n"
+            else:
+                yield f"data: {payload}\n\n"
     finally:
         sse_manager.unsubscribe(code, token)
         try:

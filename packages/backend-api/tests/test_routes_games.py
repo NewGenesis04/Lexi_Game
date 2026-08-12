@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 
 from httpx import ASGITransport, AsyncClient
 
+from game_engine import PassRequest, PlaceRequest, SwapRequest  # type: ignore
 from game_engine.models import Dictionary, GamePhase  # type: ignore
 from backend_api.main import app  # type: ignore
 from backend_api.routes.games import _require_session, get_service  # type: ignore
@@ -49,9 +50,7 @@ def mock_svc():
     svc.create_game.return_value = CreateGameOut(code="ABCD12", token="tok123", player_id="p1")
     svc.join_game.return_value = JoinGameOut(token="tok456", player_id="p2", state=_state_out())
     svc.get_game.return_value = _state_out()
-    svc.place_tiles.return_value = _state_out()
-    svc.swap_tiles.return_value = _state_out()
-    svc.pass_turn.return_value = _state_out()
+    svc.apply_move.return_value = _state_out()
     svc.forfeit.return_value = _state_out()
     return svc
 
@@ -92,7 +91,7 @@ async def test_create_game_returns_201(client, mock_svc):
     data = resp.json()
     assert data["code"] == "ABCD12"
     assert data["token"] == "tok123"
-    mock_svc.create_game.assert_awaited_once_with("Alice", Dictionary.TWL06, 180.0)
+    mock_svc.create_game.assert_awaited_once_with("Alice", Dictionary.TWL06, 180.0, None)
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +102,7 @@ async def test_join_game_returns_200(client, mock_svc):
     resp = await client.post("/games/ABCD12/join", json={"nickname": "Bob"})
     assert resp.status_code == 200
     assert resp.json()["token"] == "tok456"
-    mock_svc.join_game.assert_awaited_once_with("ABCD12", "Bob")
+    mock_svc.join_game.assert_awaited_once_with("ABCD12", "Bob", None)
 
 
 # ---------------------------------------------------------------------------
@@ -136,11 +135,12 @@ async def test_submit_place_move(client, mock_svc):
         ],
     })
     assert resp.status_code == 200
-    mock_svc.place_tiles.assert_awaited_once()
-    args = mock_svc.place_tiles.call_args
+    mock_svc.apply_move.assert_awaited_once()
+    args = mock_svc.apply_move.call_args
     assert args[0][0] == "ABCD12"
     assert args[0][1] == "p1"
-    assert len(args[0][2]) == 3
+    assert isinstance(args[0][2], PlaceRequest)
+    assert len(args[0][2].tiles) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +153,11 @@ async def test_submit_swap_move(client, mock_svc):
         "letters": ["C", "A", "T"],
     })
     assert resp.status_code == 200
-    mock_svc.swap_tiles.assert_awaited_once_with("ABCD12", "p1", ["C", "A", "T"])
+    args = mock_svc.apply_move.call_args
+    assert args[0][0] == "ABCD12"
+    assert args[0][1] == "p1"
+    assert isinstance(args[0][2], SwapRequest)
+    assert args[0][2].letters == ["C", "A", "T"]
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +167,10 @@ async def test_submit_swap_move(client, mock_svc):
 async def test_submit_pass_move(client, mock_svc):
     resp = await client.post("/games/ABCD12/moves", json={"type": "pass"})
     assert resp.status_code == 200
-    mock_svc.pass_turn.assert_awaited_once_with("ABCD12", "p1")
+    args = mock_svc.apply_move.call_args
+    assert args[0][0] == "ABCD12"
+    assert args[0][1] == "p1"
+    assert isinstance(args[0][2], PassRequest)
 
 
 # ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from game_engine.models import GamePhase
 
 from backend_api import game_manager
+from backend_api.connection_lifecycle import lifecycle
 from backend_api.repositories.game_repo import GameRepo
 from backend_api.routes import events, games
 
@@ -47,13 +48,13 @@ async def _gc_sweep(repo: GameRepo) -> None:
             async with game_manager.get_lock(code):
                 state = await repo.load_game(code)
                 if state is None:
-                    game_manager.remove_game(code)
+                    lifecycle.remove_game(code)
                     continue
                 if state.phase != GamePhase.PAUSED or state.paused_at is None:
                     continue
                 elapsed = time.time() - state.paused_at
                 if elapsed >= 1800.0:  # 30 minutes
-                    game_manager.remove_game(code)
+                    lifecycle.remove_game(code)
                     await repo.delete_game(code)
                     await repo.deregister_active(code)
 

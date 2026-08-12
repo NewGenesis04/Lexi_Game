@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted } from 'vue'
+import { computed, toRef } from 'vue'
 import type { PlayerOut } from '../../types/game'
 import { AVATARS } from '../../constants/avatars'
+import { useClocks, formatTime } from '../../composables/useClocks'
 
 const props = defineProps<{
   player: PlayerOut | null
@@ -16,47 +17,10 @@ const avatarSrc = computed(() => {
   return key ? (AVATARS[key] ?? null) : null
 })
 
-const displaySeconds = ref(0)
-let serverBase = 0
-let baseTimestamp = 0
-let ticker: ReturnType<typeof setInterval> | null = null
-
-function stopTicker() {
-  if (ticker !== null) { clearInterval(ticker); ticker = null }
-}
-
-function startTicker() {
-  stopTicker()
-  ticker = setInterval(() => {
-    displaySeconds.value = Math.max(0, Math.ceil(serverBase - (Date.now() - baseTimestamp) / 1000))
-  }, 1000)
-}
-
-watch(() => props.player?.time_remaining_secs, (val) => {
-  if (val !== undefined) {
-    serverBase = val
-    baseTimestamp = Date.now()
-    displaySeconds.value = Math.ceil(val)
-  }
-}, { immediate: true })
-
-watch(() => props.isActiveTurn, (active) => {
-  if (active && props.player) {
-    baseTimestamp = Date.now()
-    displaySeconds.value = Math.ceil(serverBase)
-    startTicker()
-  } else {
-    stopTicker()
-  }
-}, { immediate: true })
-
-onUnmounted(() => stopTicker())
-
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${String(s).padStart(2, '0')}`
-}
+const { displaySeconds, isOvertime, isClockUrgent } = useClocks(
+  toRef(props, 'player'),
+  toRef(props, 'isActiveTurn'),
+)
 
 const dotStyle = computed(() => {
   if (!props.player) return { background: 'var(--color-dot-offline)' }
@@ -68,9 +32,6 @@ const dotStyle = computed(() => {
   }
   return { background: 'var(--color-dot-offline)' }
 })
-
-const isOvertime = computed(() => (props.player?.overtime_count ?? 0) > 0)
-const isClockUrgent = computed(() => isOvertime.value || displaySeconds.value < 60)
 
 const cardStyle = computed(() => {
   if (props.isActiveTurn && props.connected) {

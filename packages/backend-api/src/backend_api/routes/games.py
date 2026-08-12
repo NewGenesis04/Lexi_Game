@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
+from game_engine import PassRequest, PlaceRequest, SwapRequest
+
 from backend_api.repositories.game_repo import GameRepo
 from backend_api.schemas import (
     CreateGameOut, CreateGameRequest, GameStateOut, JoinGameOut, JoinGameRequest,
@@ -66,10 +68,13 @@ async def submit_move(
     svc: GameService = Depends(get_service),
 ) -> GameStateOut:
     if isinstance(body, PlaceMoveRequest):
-        return await svc.place_tiles(code, session.player_id, [t.to_domain() for t in body.tiles])
+        return await svc.apply_move(
+            code, session.player_id,
+            PlaceRequest(player_id=session.player_id, tiles=[t.to_domain() for t in body.tiles]),
+        )
     if isinstance(body, SwapMoveRequest):
-        return await svc.swap_tiles(code, session.player_id, body.letters)
-    return await svc.pass_turn(code, session.player_id)
+        return await svc.apply_move(code, session.player_id, SwapRequest(player_id=session.player_id, letters=body.letters))
+    return await svc.apply_move(code, session.player_id, PassRequest(player_id=session.player_id))
 
 
 @router.post("/{code}/forfeit", response_model=GameStateOut)

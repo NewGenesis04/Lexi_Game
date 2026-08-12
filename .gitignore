@@ -8,3 +8,4 @@ dist/
 *.egg-info/
 packages/game-engine/src/game_engine/dictionaries/*.pkl
 /teach
+CONTEXT.md
