@@ -132,6 +132,7 @@ lexi/
 ├── packages/
 │   ├── game-engine/        # Pure domain logic
 │   │   └── src/game_engine/
+│   │       ├── turn.py     # Turn.apply — the one seam for place/swap/pass + clock/end-of-game rules
 │   │       ├── board.py    # Grid, adjacency, placement rules
 │   │       ├── scoring.py  # Score calculation + premiums
 │   │       ├── bag.py      # Tile draw and exchange
@@ -139,15 +140,19 @@ lexi/
 │   │       └── dictionary.py  # Pickled frozenset lookup
 │   └── backend-api/        # FastAPI server
 │       └── src/backend_api/
-│           ├── routes/     # HTTP endpoints + SSE
-│           ├── services/   # Game lifecycle orchestration
-│           └── repositories/  # Redis persistence
+│           ├── routes/               # HTTP endpoints + SSE
+│           ├── services/             # Game lifecycle orchestration
+│           ├── repositories/         # Redis persistence
+│           ├── connection_lifecycle.py  # SSE connect/disconnect, pause/resume/forfeit state machine
+│           ├── game_broadcaster.py      # Serializes GameState per viewer, pumps SSE payloads
+│           ├── turn_clock.py            # Per-game elapsed-time measurement + overtime rules
+│           └── game_manager.py          # Per-game locks + turn timers
 ├── frontend/               # Vue 3 SPA
 │   └── src/
 │       ├── views/          # LobbyView, GameView
 │       ├── components/     # Board, Rack, Panels, Sidebar
 │       ├── stores/         # Pinia — single source of truth
-│       ├── composables/    # SSE, Theme, PendingMove
+│       ├── composables/    # sse, useClocks, usePendingMove, useTheme
 │       └── lexi.css        # All design tokens
 └── docs/
     ├── ARCHITECTURE.md     # Full system decisions (Q1–Q31)
