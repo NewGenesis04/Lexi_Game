@@ -95,7 +95,10 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function addToast(text: string, type: ToastMessage['type'] = 'info') {
-    const id = crypto.randomUUID()
+    // crypto.randomUUID() requires a secure context (HTTPS or localhost) and
+    // is undefined over plain HTTP — e.g. testing via a LAN IP from a phone.
+    // Toast ids are just local list keys, not security-sensitive.
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     toasts.value.push({ id, text, type })
     setTimeout(() => {
       toasts.value = toasts.value.filter((t) => t.id !== id)

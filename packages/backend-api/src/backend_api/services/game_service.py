@@ -144,14 +144,12 @@ class GameService:
             if not result.ok:
                 # NOT_YOUR_TURN / NOT_PLAYING are rejected before any clock
                 # charge happens, so only the other errors mutate the state.
+                # Rejected-move feedback (including which word failed) stays
+                # private to the mover via the HTTP error below — the
+                # opponent doesn't need to know about a move that never
+                # actually happened.
                 if result.error not in (TurnError.NOT_YOUR_TURN, TurnError.NOT_PLAYING):
                     await self._repo.save_game(state)
-                    notif = (
-                        f'Opponent\'s word "{result.words[0]}" was not valid'
-                        if result.error == TurnError.INVALID_WORD and result.words
-                        else "Opponent made an invalid move"
-                    )
-                    await broadcaster.notify(code, notif, skip_player_id=player_id)
                 self._raise_move_error(result)
                 raise AssertionError("unreachable")
 

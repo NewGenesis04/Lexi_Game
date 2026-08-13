@@ -16,6 +16,11 @@ const router = createRouter({
       beforeEnter: gameGuard,
     },
     {
+      path: '/rules',
+      name: 'rules',
+      component: () => import('../views/RulesView.vue'),
+    },
+    {
       path: '/prototype/ui',
       name: 'prototype-ui',
       component: () => import('../views/PrototypeUI.vue'),

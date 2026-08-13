@@ -25,6 +25,18 @@
   --color-lexi-primary-hover:  var(--color-primary-hover);
   --color-lexi-primary-subtle: var(--color-primary-subtle);
 
+  /* CTA (primary call-to-action button/tab) — scoped separately from
+     --color-lexi-primary so it can carry its own dark-mode look. */
+  --color-lexi-cta:        var(--color-cta-bg);
+  --color-lexi-cta-text:   var(--color-cta-text);
+  --color-lexi-cta-border: var(--color-cta-border);
+  --shadow-lexi-cta:         var(--shadow-cta);
+  --shadow-lexi-cta-lg:      var(--shadow-cta-lg);
+  --shadow-lexi-cta-pressed: var(--shadow-cta-pressed);
+
+  /* Active/selection accent (ghost tile, avatar ring, turn indicator) */
+  --color-lexi-active: var(--color-active-highlight);
+
   /* Secondary */
   --color-lexi-secondary:         var(--color-secondary);
   --color-lexi-secondary-hover:   var(--color-secondary-hover);

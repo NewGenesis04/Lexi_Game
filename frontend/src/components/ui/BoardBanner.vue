@@ -14,13 +14,14 @@ const dotClass: Record<string, string> = {
 </script>
 
 <template>
-  <!-- Fixed-height wrapper prevents layout shift when banner appears/disappears -->
-  <div class="flex justify-center items-end" style="height: 36px;">
+  <!-- Min-height wrapper prevents layout shift when banner appears/disappears;
+       grows taller if a long message wraps onto multiple lines. -->
+  <div class="flex justify-center items-end" style="min-height: 36px;">
     <Transition name="banner">
       <div
         v-if="toast"
-        class="flex items-center gap-2 px-4 bg-lexi-notif text-lexi-notif-text border-lexi-light border-lexi-border shadow-lexi-sm font-lexi-ui text-lexi-sm tracking-lexi-ui cursor-default select-none"
-        style="height: 28px; white-space: nowrap;"
+        class="flex items-center gap-2 px-4 py-1.5 max-w-[90vw] bg-lexi-notif text-lexi-notif-text border-lexi-light border-lexi-border shadow-lexi-sm font-lexi-ui text-lexi-sm tracking-lexi-ui cursor-default select-none"
+        style="min-height: 28px;"
         @click="store.clearToasts()"
       >
         <span :class="['w-1.5 h-1.5 rounded-full flex-shrink-0', dotClass[toast.type] ?? 'bg-lexi-border-subtle']" />

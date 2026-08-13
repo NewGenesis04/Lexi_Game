@@ -6,6 +6,7 @@ import { usePendingMove } from '../composables/usePendingMove'
 import GameBoard from '../components/game/GameBoard.vue'
 import TileRack from '../components/game/TileRack.vue'
 import PlayerPanel from '../components/ui/PlayerPanel.vue'
+import PlayerMini from '../components/ui/PlayerMini.vue'
 import MoveControls from '../components/ui/MoveControls.vue'
 import BoardBanner from '../components/ui/BoardBanner.vue'
 import GameOverCard from '../components/ui/GameOverCard.vue'
@@ -54,7 +55,22 @@ function ghostLetterAt(r: number, c: number): string | undefined {
 
 async function copyCode() {
   try {
-    await navigator.clipboard.writeText(code)
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(code)
+    } else {
+      // navigator.clipboard requires a secure context (HTTPS or localhost) —
+      // unavailable e.g. testing over plain HTTP via a LAN IP. Fall back to
+      // the legacy execCommand path, which still works there.
+      const textarea = document.createElement('textarea')
+      textarea.value = code
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      const copied = document.execCommand('copy')
+      document.body.removeChild(textarea)
+      if (!copied) throw new Error('execCommand copy failed')
+    }
     store.addToast(`Code copied: ${code}`, 'info')
   } catch {
     store.addToast('Failed to copy room code', 'error')
@@ -147,11 +163,11 @@ function handlePlayAgain() {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-lexi-bg text-lexi-text">
-    <header class="flex items-center justify-between px-6 py-3 bg-lexi-header border-b-2 border-lexi-header-border">
+  <div class="flex min-h-dvh flex-col bg-lexi-bg text-lexi-text">
+    <header class="flex items-center justify-between px-2 py-1.5 lg:px-6 lg:py-3 bg-lexi-header border-b-2 border-lexi-header-border">
       <!-- Game code copy -->
       <button
-        class="flex items-center gap-1.5 px-2 py-1 font-lexi-ui text-lexi-xs font-bold tracking-lexi-wide text-lexi-text-secondary uppercase cursor-pointer transition-colors duration-lexi-fast hover:text-lexi-text"
+        class="flex items-center gap-1 lg:gap-1.5 px-1.5 py-1 lg:px-2 font-lexi-ui text-lexi-xs font-bold tracking-lexi-wide text-lexi-text-secondary uppercase cursor-pointer transition-colors duration-lexi-fast hover:text-lexi-text"
         title="Copy room code"
         @click="copyCode"
       >
@@ -162,10 +178,10 @@ function handlePlayAgain() {
         </svg>
       </button>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1 lg:gap-2">
         <!-- Theme toggle -->
         <button
-          class="w-8 h-8 flex items-center justify-center text-lexi-text-secondary cursor-pointer transition-colors duration-lexi-fast hover:text-lexi-text"
+          class="w-7 h-7 lg:w-8 lg:h-8 flex items-center justify-center text-lexi-text-secondary cursor-pointer transition-colors duration-lexi-fast hover:text-lexi-text"
           :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
           @click="toggle"
         >
@@ -180,9 +196,19 @@ function handlePlayAgain() {
           </svg>
         </button>
 
+        <!-- Rules link (opens in a new tab) -->
+        <a
+          href="/rules"
+          target="_blank"
+          rel="noopener"
+          class="px-2 py-1 lg:px-3 lg:py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-text-secondary border-lexi border-lexi-border-muted shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:text-lexi-text hover:border-lexi-border hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
+        >
+          RULES
+        </a>
+
         <!-- History button -->
         <button
-          class="px-3 py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-text-secondary border-lexi border-lexi-border-muted shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:text-lexi-text hover:border-lexi-border hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
+          class="px-2 py-1 lg:px-3 lg:py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-text-secondary border-lexi border-lexi-border-muted shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:text-lexi-text hover:border-lexi-border hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
           @click="historyOpen = true"
         >
           HISTORY
@@ -190,7 +216,7 @@ function handlePlayAgain() {
 
         <!-- Leave button -->
         <button
-          class="px-3 py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-danger border-lexi border-lexi-danger shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
+          class="px-2 py-1 lg:px-3 lg:py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-danger border-lexi border-lexi-danger shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
           @click="handleLeave"
         >
           LEAVE
@@ -198,8 +224,34 @@ function handlePlayAgain() {
       </div>
     </header>
 
-    <div class="flex flex-1 flex-col items-center gap-6 p-6 pb-20 lg:flex-row lg:items-start lg:justify-center">
+    <!-- Combined player header (mobile only) — flat horizontal strip so both
+         players' score/clock are visible without pushing the board below the fold. -->
+    <div class="flex lg:hidden w-full items-center justify-between gap-2 px-3 py-2 bg-lexi-header border-b-2 border-lexi-header-border">
+      <PlayerMini
+        :player="store.opponent"
+        align="left"
+        :is-active-turn="!store.isMyTurn && store.phase === 'playing'"
+        :connected="store.connected"
+        :avatar-key="store.opponent?.avatar"
+      />
+      <div class="flex flex-shrink-0 items-center gap-1 px-2 py-1 bg-lexi-bg-sunken border-lexi-light border-lexi-border">
+        <img :src="bagImg" class="w-3.5 h-3.5" alt="bag" />
+        <span class="font-lexi-numeric text-lexi-xs font-bold text-lexi-text lexi-numeric">
+          {{ store.game?.bag_size ?? 0 }}
+        </span>
+      </div>
+      <PlayerMini
+        :player="store.myPlayer"
+        align="right"
+        :is-active-turn="store.isMyTurn && store.phase === 'playing'"
+        :connected="store.myPlayer?.connected ?? true"
+        :avatar-key="store.session?.avatar"
+      />
+    </div>
+
+    <div class="flex flex-1 flex-col items-center gap-3 p-3 pb-[max(24px,env(safe-area-inset-bottom))] lg:flex-row lg:items-start lg:justify-center lg:gap-6 lg:p-6 lg:pb-20">
       <PlayerPanel
+        class="hidden lg:block"
         :player="store.opponent"
         :is-active-turn="!store.isMyTurn && store.phase === 'playing'"
         :connected="store.connected"
@@ -207,8 +259,8 @@ function handlePlayAgain() {
         position="top"
       />
 
-      <div class="flex flex-col items-center gap-4">
-        <div class="flex items-center gap-1.5 self-end px-3 py-1 bg-lexi-bg-sunken border-lexi-light border-lexi-border">
+      <div class="flex flex-1 flex-col items-center justify-between gap-2 lg:flex-none lg:justify-start lg:gap-4">
+        <div class="hidden lg:flex items-center gap-1.5 self-end px-3 py-1 bg-lexi-bg-sunken border-lexi-light border-lexi-border">
           <img :src="bagImg" class="w-4 h-4" alt="bag" />
           <span class="font-lexi-numeric text-lexi-xs font-bold text-lexi-text lexi-numeric">
             {{ store.game?.bag_size ?? 0 }}
@@ -236,6 +288,7 @@ function handlePlayAgain() {
         />
         <MoveControls
           v-if="store.isMyTurn && store.phase === 'playing'"
+          class="w-full sticky bottom-0 z-10 bg-lexi-bg border-t-2 border-lexi-border-muted pt-2 pb-[max(16px,env(safe-area-inset-bottom))] lg:static lg:w-auto lg:bg-transparent lg:border-t-0 lg:pt-0 lg:pb-0"
           :code="code"
           :has-placements="hasPendingPlacements"
           :has-swaps="hasSwapSelection"
@@ -251,6 +304,7 @@ function handlePlayAgain() {
       </div>
 
       <PlayerPanel
+        class="hidden lg:block"
         :player="store.myPlayer"
         :is-active-turn="store.isMyTurn && store.phase === 'playing'"
         :connected="store.myPlayer?.connected ?? true"

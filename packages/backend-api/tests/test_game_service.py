@@ -552,7 +552,9 @@ async def test_invalid_word_error_names_the_word(repo, svc):
     assert "XZ" in exc.value.detail
 
 
-async def test_invalid_word_notifies_opponent_with_the_word(repo, svc):
+async def test_invalid_word_does_not_notify_the_opponent(repo, svc):
+    """Rejected-move feedback stays private to the mover — the opponent
+    doesn't need to know about a move that never actually happened."""
     await repo.save_game(_state(p1_letters="XXXZZZQ"))
     sse_manager.subscribe("ABCD12", "tok-p2", "p2")
     try:
@@ -560,8 +562,7 @@ async def test_invalid_word_notifies_opponent_with_the_word(repo, svc):
         with patch("backend_api.sse_manager.broadcast", new_callable=AsyncMock) as mock_broadcast:
             with pytest.raises(HTTPException):
                 await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
-        payloads = mock_broadcast.call_args.args[0]
-        assert "XZ" in payloads["tok-p2"]
+        mock_broadcast.assert_not_called()
     finally:
         sse_manager.unsubscribe("ABCD12", "tok-p2")
 

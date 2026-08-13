@@ -66,7 +66,7 @@ function premium(row: number, col: number) {
 </script>
 
 <template>
-  <div class="relative">
+  <div class="relative w-full overflow-x-auto">
     <div class="board-container">
 
       <div class="label-row">
@@ -141,6 +141,12 @@ function premium(row: number, col: number) {
 
 <style scoped>
 .board-container {
+  /* Fluid board: shrinks continuously down to a legible/tappable floor on
+     narrow phones instead of overflowing. The 58px covers everything between
+     the viewport edge and a grid cell: GameView's own p-3 padding (24px),
+     this container's padding+border (20px), and the 14 1px grid gaps. */
+  --board-label: clamp(14px, 4.5vw, 24px);
+  --board-cell: clamp(18px, calc((100vw - 2 * var(--board-label) - 58px) / 15), 34px);
   display: inline-block;
   border: 2px solid var(--color-board-border);
   padding: 8px;
@@ -155,15 +161,15 @@ function premium(row: number, col: number) {
 }
 
 .label-spacer {
-  width: 24px;
+  width: var(--board-label);
   flex-shrink: 0;
 }
 
 .col-label {
-  width: 34px;
+  width: var(--board-cell);
   text-align: center;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: clamp(9px, calc(var(--board-label) * 0.5), 11px);
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--color-text-secondary);
@@ -175,19 +181,19 @@ function premium(row: number, col: number) {
 }
 
 .row-labels {
-  width: 24px;
+  width: var(--board-label);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
 }
 
 .row-label {
-  height: 34px;
+  height: var(--board-cell);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: clamp(9px, calc(var(--board-label) * 0.5), 11px);
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--color-text-secondary);
@@ -195,16 +201,16 @@ function premium(row: number, col: number) {
 
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(15, 34px);
-  grid-template-rows: repeat(15, 34px);
+  grid-template-columns: repeat(15, var(--board-cell));
+  grid-template-rows: repeat(15, var(--board-cell));
   gap: 1px;
-  background-color: var(--color-border-muted);
+  background-color: var(--color-board-gridline);
   overflow: hidden;
 }
 
 .cell {
-  width: 34px;
-  height: 34px;
+  width: var(--board-cell);
+  height: var(--board-cell);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -228,7 +234,7 @@ function premium(row: number, col: number) {
 
 .tile-letter {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: clamp(11px, calc(var(--board-cell) * 0.5), 18px);
   font-weight: 600;
   color: var(--color-tile-placed-text);
 }
@@ -238,22 +244,22 @@ function premium(row: number, col: number) {
   bottom: 2px;
   right: 3px;
   font-family: var(--font-ui);
-  font-size: 7px;
+  font-size: clamp(5px, calc(var(--board-cell) * 0.2), 7px);
   font-weight: 700;
   line-height: 1;
   color: var(--color-tile-placed-points);
 }
 
 .cell--ghost {
-  background: var(--color-primary-subtle);
-  box-shadow: inset 0 0 0 2px var(--color-primary);
+  background: var(--color-active-highlight-subtle);
+  box-shadow: inset 0 0 0 2px var(--color-active-highlight);
 }
 
 .ghost-letter {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: clamp(11px, calc(var(--board-cell) * 0.5), 18px);
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--color-active-highlight);
 }
 
 .cell--dl     { background: var(--color-sq-dl-bg); }
@@ -264,7 +270,7 @@ function premium(row: number, col: number) {
 
 .premium-label {
   font-family: var(--font-ui);
-  font-size: 8px;
+  font-size: clamp(6px, calc(var(--board-cell) * 0.24), 8px);
   font-weight: 700;
   letter-spacing: 0.1em;
 }

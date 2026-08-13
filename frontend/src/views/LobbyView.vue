@@ -50,7 +50,17 @@ async function handleJoin() {
 </script>
 
 <template>
-  <main class="relative flex min-h-screen items-center justify-center bg-lexi-bg">
+  <main class="relative flex min-h-dvh items-center justify-center bg-lexi-bg">
+
+    <!-- Rules link (opens in a new tab) -->
+    <a
+      href="/rules"
+      target="_blank"
+      rel="noopener"
+      class="absolute top-4 left-4 px-3 py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-text-secondary border-lexi border-lexi-border shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:text-lexi-text hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
+    >
+      RULES
+    </a>
 
     <!-- Theme toggle -->
     <button
@@ -86,7 +96,7 @@ async function handleJoin() {
           :class="[
             'w-full aspect-square overflow-hidden transition-all duration-lexi-fast cursor-pointer p-0',
             selectedAvatar === key
-              ? 'border-lexi border-lexi-primary shadow-lexi-sm -translate-x-px -translate-y-px'
+              ? 'border-lexi border-lexi-active shadow-lexi-sm -translate-x-px -translate-y-px'
               : 'border-lexi-light border-lexi-border-muted hover:border-lexi-border'
           ]"
           @click="selectedAvatar = key"
@@ -99,8 +109,8 @@ async function handleJoin() {
       <div class="flex border-lexi border-lexi-border mb-6">
         <button
           :class="tab === 'create'
-            ? 'bg-lexi-primary text-lexi-text-on-accent'
-            : 'bg-transparent text-lexi-text-secondary hover:bg-lexi-bg-sunken'"
+            ? 'bg-lexi-cta text-lexi-cta-text'
+            : 'bg-lexi-bg-sunken text-lexi-text-secondary hover:text-lexi-text'"
           class="flex-1 py-2 font-lexi-ui text-lexi-sm tracking-lexi-wide uppercase font-bold border-r border-lexi-border transition-colors duration-lexi-fast cursor-pointer"
           @click="tab = 'create'"
         >
@@ -108,8 +118,8 @@ async function handleJoin() {
         </button>
         <button
           :class="tab === 'join'
-            ? 'bg-lexi-primary text-lexi-text-on-accent'
-            : 'bg-transparent text-lexi-text-secondary hover:bg-lexi-bg-sunken'"
+            ? 'bg-lexi-cta text-lexi-cta-text'
+            : 'bg-lexi-bg-sunken text-lexi-text-secondary hover:text-lexi-text'"
           class="flex-1 py-2 font-lexi-ui text-lexi-sm tracking-lexi-wide uppercase font-bold transition-colors duration-lexi-fast cursor-pointer"
           @click="tab = 'join'"
         >
@@ -122,9 +132,9 @@ async function handleJoin() {
         <input
           v-model="nickname"
           placeholder="YOUR NAME"
-          maxlength="10"
+          maxlength="15"
           required
-          class="w-full px-3 py-2 bg-lexi-bg-sunken text-lexi-text border-lexi border-lexi-border shadow-lexi-sm font-lexi-ui text-lexi-base tracking-lexi-ui placeholder:text-lexi-text-muted focus:outline-none focus:shadow-lexi-md focus:-translate-x-px focus:-translate-y-px transition-all duration-lexi-fast"
+          class="w-full px-3 py-2 bg-lexi-bg-sunken text-lexi-text border-lexi border-lexi-border shadow-lexi-sm font-lexi-ui text-lexi-base tracking-lexi-ui placeholder:text-lexi-text-secondary focus:outline-none focus:shadow-lexi-md focus:-translate-x-px focus:-translate-y-px transition-all duration-lexi-fast"
         />
         <select
           v-model="dictionary"
@@ -146,7 +156,7 @@ async function handleJoin() {
         <button
           type="submit"
           :disabled="loading"
-          class="w-full py-2 bg-lexi-primary text-lexi-text-on-accent border-lexi border-lexi-border shadow-lexi-md font-lexi-ui text-lexi-sm tracking-lexi-wide uppercase font-bold transition-all duration-lexi-base hover:shadow-lexi-lg hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 cursor-pointer"
+          class="w-full py-2 bg-lexi-cta text-lexi-cta-text border-lexi border-lexi-cta-border shadow-lexi-cta font-lexi-ui text-lexi-sm tracking-lexi-wide uppercase font-bold transition-all duration-lexi-base hover:shadow-lexi-cta-lg hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-cta-pressed active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 cursor-pointer"
         >
           {{ loading ? 'CREATING...' : 'CREATE GAME' }}
         </button>
@@ -160,20 +170,20 @@ async function handleJoin() {
           required
           maxlength="6"
           autocapitalize="characters"
-          class="w-full px-3 py-2 bg-lexi-bg-sunken text-lexi-text border-lexi border-lexi-border shadow-lexi-sm font-lexi-ui text-lexi-base tracking-lexi-wide text-center uppercase placeholder:text-lexi-text-muted placeholder:normal-case focus:outline-none focus:shadow-lexi-md focus:-translate-x-px focus:-translate-y-px transition-all duration-lexi-fast"
+          class="w-full px-3 py-2 bg-lexi-bg-sunken text-lexi-text border-lexi border-lexi-border shadow-lexi-sm font-lexi-ui text-lexi-base tracking-lexi-wide text-center uppercase placeholder:text-lexi-text-secondary placeholder:normal-case focus:outline-none focus:shadow-lexi-md focus:-translate-x-px focus:-translate-y-px transition-all duration-lexi-fast"
           @input="joinCode = joinCode.toUpperCase()"
         />
         <input
           v-model="nickname"
           placeholder="YOUR NAME"
-          maxlength="10"
+          maxlength="15"
           required
-          class="w-full px-3 py-2 bg-lexi-bg-sunken text-lexi-text border-lexi border-lexi-border shadow-lexi-sm font-lexi-ui text-lexi-base tracking-lexi-ui placeholder:text-lexi-text-muted focus:outline-none focus:shadow-lexi-md focus:-translate-x-px focus:-translate-y-px transition-all duration-lexi-fast"
+          class="w-full px-3 py-2 bg-lexi-bg-sunken text-lexi-text border-lexi border-lexi-border shadow-lexi-sm font-lexi-ui text-lexi-base tracking-lexi-ui placeholder:text-lexi-text-secondary focus:outline-none focus:shadow-lexi-md focus:-translate-x-px focus:-translate-y-px transition-all duration-lexi-fast"
         />
         <button
           type="submit"
           :disabled="loading"
-          class="w-full py-2 bg-lexi-primary text-lexi-text-on-accent border-lexi border-lexi-border shadow-lexi-md font-lexi-ui text-lexi-sm tracking-lexi-wide uppercase font-bold transition-all duration-lexi-base hover:shadow-lexi-lg hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 cursor-pointer"
+          class="w-full py-2 bg-lexi-cta text-lexi-cta-text border-lexi border-lexi-cta-border shadow-lexi-cta font-lexi-ui text-lexi-sm tracking-lexi-wide uppercase font-bold transition-all duration-lexi-base hover:shadow-lexi-cta-lg hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-cta-pressed active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 cursor-pointer"
         >
           {{ loading ? 'JOINING...' : 'JOIN GAME' }}
         </button>

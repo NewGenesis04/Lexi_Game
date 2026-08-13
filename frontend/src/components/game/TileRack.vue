@@ -40,7 +40,7 @@ function tileStateClass(i: number): string {
 </script>
 
 <template>
-  <div class="rack-container inline-flex items-center gap-1.5 px-1.5 py-1.5">
+  <div class="rack-container flex flex-wrap items-center justify-center gap-1.5 px-1.5 py-1.5">
     <template v-if="tiles.length">
       <button
         v-for="i in shuffleOrder"

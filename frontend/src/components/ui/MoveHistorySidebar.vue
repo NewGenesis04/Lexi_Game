@@ -113,13 +113,19 @@ const reversedMoves = computed(() => [...props.moves].reverse())
   left: 0;
   top: 0;
   z-index: 50;
-  width: 260px;
+  width: min(85vw, 340px);
   height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--color-bg-elevated);
   border-right: 2px solid var(--color-border);
   box-shadow: var(--shadow-lg);
+}
+
+@media (min-width: 640px) {
+  .sidebar {
+    width: 260px;
+  }
 }
 
 /* ── Header ── */

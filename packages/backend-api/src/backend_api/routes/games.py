@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Request
 
 from game_engine import PassRequest, PlaceRequest, SwapRequest
 
@@ -13,6 +15,9 @@ from backend_api.services.game_service import GameService
 from backend_api.session import PlayerSession
 
 router = APIRouter(prefix="/games", tags=["games"])
+
+# Game codes are always exactly 6 chars (see _generate_code in game_service.py).
+GameCode = Annotated[str, Path(min_length=6, max_length=6)]
 
 
 def _get_repo(request: Request) -> GameRepo:
@@ -44,7 +49,7 @@ async def create_game(
 
 @router.post("/{code}/join", response_model=JoinGameOut)
 async def join_game(
-    code: str,
+    code: GameCode,
     body: JoinGameRequest,
     svc: GameService = Depends(get_service),
 ) -> JoinGameOut:
@@ -53,7 +58,7 @@ async def join_game(
 
 @router.get("/{code}", response_model=GameStateOut)
 async def get_game(
-    code: str,
+    code: GameCode,
     session: PlayerSession = Depends(_require_session),
     svc: GameService = Depends(get_service),
 ) -> GameStateOut:
@@ -62,7 +67,7 @@ async def get_game(
 
 @router.post("/{code}/moves", response_model=GameStateOut)
 async def submit_move(
-    code: str,
+    code: GameCode,
     body: MoveRequest,
     session: PlayerSession = Depends(_require_session),
     svc: GameService = Depends(get_service),
@@ -79,7 +84,7 @@ async def submit_move(
 
 @router.post("/{code}/forfeit", response_model=GameStateOut)
 async def forfeit_game(
-    code: str,
+    code: GameCode,
     session: PlayerSession = Depends(_require_session),
     svc: GameService = Depends(get_service),
 ) -> GameStateOut:

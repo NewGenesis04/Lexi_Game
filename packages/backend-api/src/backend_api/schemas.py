@@ -24,14 +24,14 @@ class PlacedTileIn(BaseModel):
 
 
 class CreateGameRequest(BaseModel):
-    nickname: str
+    nickname: str = Field(min_length=1, max_length=15)
     dictionary: Dictionary
     time_per_player_secs: float
     avatar: str | None = None
 
 
 class JoinGameRequest(BaseModel):
-    nickname: str
+    nickname: str = Field(min_length=1, max_length=15)
     avatar: str | None = None
 
 

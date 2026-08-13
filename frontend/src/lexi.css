@@ -141,6 +141,17 @@
   --color-primary-active:    var(--prim-yellow-600);
   --color-primary-subtle:    var(--prim-yellow-100);
 
+  /* --- CTA (primary call-to-action button/tab): unchanged from primary
+     in light mode. Kept as its own token family — scoped separately from
+     --color-primary — so the Lobby's Cyber Arcade dark-mode look doesn't
+     also repaint the in-game SUBMIT/PLAY AGAIN buttons. --- */
+  --color-cta-bg:     var(--prim-yellow-400);
+  --color-cta-text:   var(--color-text-on-accent);
+  --color-cta-border: var(--color-border);
+  --shadow-cta:         var(--shadow-md);
+  --shadow-cta-lg:      var(--shadow-lg);
+  --shadow-cta-pressed: var(--shadow-pressed);
+
   /* --- Secondary (Cobalt) --- */
   --color-secondary:         var(--prim-cobalt-500);
   --color-secondary-hover:   var(--prim-cobalt-600);
@@ -184,6 +195,11 @@
   --color-panel-active-accent: var(--prim-yellow-400);
   --color-panel-score:       var(--prim-ink-900);
   --color-panel-clock-urgent: var(--prim-brick-500);
+
+  /* --- Active highlight: ghost/pending tile border on the board.
+     Unchanged from --color-primary — light mode keeps its current look. --- */
+  --color-active-highlight:         var(--prim-yellow-400);
+  --color-active-highlight-subtle:  var(--prim-yellow-100);
 
   /* --- Connection states --- */
   --color-dot-active:        var(--prim-forest-500);
@@ -235,6 +251,16 @@
   --color-primary-active:    var(--prim-olive-500);
   --color-primary-subtle:    var(--prim-olive-700);
 
+  /* --- CTA (primary call-to-action button/tab): Cyber Arcade — an
+     off-white keycap button with a heavy black offset shadow, distinct
+     from the olive --color-primary used by in-game buttons. --- */
+  --color-cta-bg:     #F1F5F9;
+  --color-cta-text:   #0F172A;
+  --color-cta-border: var(--prim-ink-100);
+  --shadow-cta:         4px 4px 0px #000000;
+  --shadow-cta-lg:      6px 6px 0px #000000;
+  --shadow-cta-pressed: 1px 1px 0px #000000;
+
   /* --- Secondary (Muted Slate) --- */
   --color-secondary:         var(--prim-slate-400);
   --color-secondary-hover:   var(--prim-slate-300);
@@ -262,22 +288,28 @@
   --color-border-subtle:     var(--prim-ink-300);
   --color-border-muted:      var(--prim-ink-600);
 
-  /* --- Tile colours --- */
-  --color-tile-bg:           var(--prim-ink-700);
-  --color-tile-border:       var(--prim-ink-100);
-  --color-tile-text:         var(--prim-ink-100);
-  --color-tile-points:       var(--prim-ink-300);
-  --color-tile-selected-bg:  var(--prim-olive-400);
-  --color-tile-selected-border: var(--prim-ink-100);
-  --color-tile-selected-text: var(--prim-ink-900);
-  --color-tile-rack-bg:      var(--prim-ink-900);
+  /* --- Tile colours: Cyber Arcade — bright keycaps popping off a dark rack --- */
+  --color-tile-bg:           #F1F5F9;
+  --color-tile-border:       #0F172A;
+  --color-tile-text:         #0F172A;
+  --color-tile-points:       #475569;
+  --color-tile-selected-bg:  #FFE600;
+  --color-tile-selected-border: #0F172A;
+  --color-tile-selected-text: #0F172A;
+  --color-tile-rack-bg:      #0B0F19;
 
   /* --- Player panel --- */
   --color-panel-bg:          var(--prim-ink-700);
   --color-panel-border:      var(--prim-ink-100);
-  --color-panel-active-accent: var(--prim-olive-400);
+  --color-panel-active-accent: #FFE600;
   --color-panel-score:       var(--prim-ink-100);
   --color-panel-clock-urgent: var(--prim-brick-400);
+
+  /* --- Active highlight: ghost/pending tile border on the board. Kept
+     separate from --color-primary (used broadly by buttons/chrome) so this
+     Cyber Arcade accent stays scoped to the board + tile selection. --- */
+  --color-active-highlight:         #FFE600;
+  --color-active-highlight-subtle:  rgba(255, 230, 0, 0.18);
 
   /* --- Connection states --- */
   --color-dot-active:        var(--prim-forest-400);
@@ -384,6 +416,7 @@
 
   --color-board-bg:          var(--prim-cream-200);
   --color-board-border:      var(--prim-ink-900);
+  --color-board-gridline:    var(--color-border-muted);
   --color-cell-empty-bg:     var(--prim-cream-100);
   --color-cell-empty-border: var(--prim-ink-300);
   --color-cell-placed-border: var(--prim-ink-900);
@@ -416,36 +449,40 @@
 
 [data-theme="dark"] {
 
-  --color-board-bg:          var(--prim-ink-900);
-  --color-board-border:      var(--prim-ink-100);
-  --color-cell-empty-bg:     var(--prim-ink-800);
+  /* --- Cyber Arcade board: deep obsidian/navy with a glowing grid --- */
+  --color-board-bg:          #0B0F19;
+  --color-board-border:      #F1F5F9;
+  --color-board-gridline:    #1F2937;
+  --color-cell-empty-bg:     #0D1117;
   --color-cell-empty-border: var(--prim-ink-600);
   --color-cell-placed-border: var(--prim-ink-100);
 
-  --color-sq-dl-bg:    var(--prim-slate-700);
-  --color-sq-dl-label: var(--prim-slate-200);
-  --color-sq-dl-border: var(--prim-slate-500);
+  /* --- Bonus squares: glowing neon pastels --- */
+  --color-sq-dl-bg:    #06B6D4;
+  --color-sq-dl-label: #0F172A;
+  --color-sq-dl-border: #0590A8;
 
-  --color-sq-tl-bg:    var(--prim-mterra-700);
-  --color-sq-tl-label: var(--prim-mterra-200);
-  --color-sq-tl-border: var(--prim-mterra-500);
+  --color-sq-tl-bg:    #F59E0B;
+  --color-sq-tl-label: #0F172A;
+  --color-sq-tl-border: #C17D09;
 
-  --color-sq-dw-bg:    var(--prim-forest-700);
-  --color-sq-dw-label: var(--prim-forest-200);
-  --color-sq-dw-border: var(--prim-forest-500);
+  --color-sq-dw-bg:    #10B981;
+  --color-sq-dw-label: #F1F5F9;
+  --color-sq-dw-border: #0B8F63;
 
-  --color-sq-tw-bg:    var(--prim-brick-700);
-  --color-sq-tw-label: var(--prim-brick-300);
-  --color-sq-tw-border: var(--prim-brick-500);
+  --color-sq-tw-bg:    #FF3366;
+  --color-sq-tw-label: #F1F5F9;
+  --color-sq-tw-border: #C81F4D;
 
-  --color-sq-star-bg:    var(--prim-olive-600);
-  --color-sq-star-label: var(--prim-olive-100);
-  --color-sq-star-border: var(--prim-ink-100);
+  --color-sq-star-bg:    #FFE600;
+  --color-sq-star-label: #0F172A;
+  --color-sq-star-border: #CCB800;
 
-  --color-tile-placed-bg:     var(--prim-ink-600);
-  --color-tile-placed-text:   var(--prim-ink-100);
-  --color-tile-placed-points: var(--prim-ink-300);
-  --color-tile-placed-border: var(--prim-ink-100);
+  /* --- Played tiles: bright keycaps popping off the dark board --- */
+  --color-tile-placed-bg:     #F1F5F9;
+  --color-tile-placed-text:   #0F172A;
+  --color-tile-placed-points: #475569;
+  --color-tile-placed-border: #0F172A;
 }
 
 
