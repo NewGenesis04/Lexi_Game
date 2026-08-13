@@ -29,11 +29,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+_FRONTEND_URL = os.getenv("FRONTEND_URL")
+
 _REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 _CORS_ORIGINS = [
     s.strip() for s in os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173",
+        f"http://localhost:5173,http://127.0.0.1:5173,{_FRONTEND_URL}"
     ).split(",")
 ]
 
