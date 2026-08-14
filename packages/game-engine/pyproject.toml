@@ -5,6 +5,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/game_engine"]
 
+[tool.hatch.build.targets.wheel.hooks.custom]
+
+[tool.hatch.build.targets.sdist.force-include]
+"../../word_lists" = "word_lists"
+
 [project]
 name = "game-engine"
 version = "0.1.0"
