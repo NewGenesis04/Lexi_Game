@@ -163,8 +163,19 @@ class GameService:
             payloads = broadcaster.serialize(state, lifecycle.connected_map(code))
             self._start_timer(state)
 
+            play_announcement: str | None = None
+            if state.last_move is not None and state.last_move.type == MoveType.PLACE:
+                mover = next((p for p in state.players if p.id == player_id), None)
+                if mover is not None and state.last_move.words:
+                    word = state.last_move.words[0].upper()
+                    play_announcement = f"{mover.nickname} played {word} for {state.last_move.score_delta} pts"
+
         if payloads:
             await sse_manager.broadcast(payloads)
+        if play_announcement:
+            # Broadcast to everyone, including the mover — this is a public
+            # activity pill, not the private rejected-move feedback above.
+            await broadcaster.notify(code, play_announcement, notif_type="success")
         return self._to_view(state, viewer_id=player_id)
 
     async def forfeit(self, code: str, player_id: str) -> GameStateOut:

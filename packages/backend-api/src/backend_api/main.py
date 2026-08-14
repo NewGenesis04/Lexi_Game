@@ -75,7 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await app.state.redis.aclose()
 
 
-app = FastAPI(title="NEO Scrabble", lifespan=lifespan)
+app = FastAPI(title="Lexi", lifespan=lifespan)
 
 
 @app.exception_handler(Exception)
@@ -94,3 +94,7 @@ app.add_middleware(
 
 app.include_router(games.router)
 app.include_router(events.router)
+
+@app.get("/", status_code=200)
+def root():
+    return {"message": "Welcome to the Lexi API"}

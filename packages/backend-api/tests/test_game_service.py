@@ -567,6 +567,38 @@ async def test_invalid_word_does_not_notify_the_opponent(repo, svc):
         sse_manager.unsubscribe("ABCD12", "tok-p2")
 
 
+async def test_successful_place_broadcasts_play_announcement(repo, svc):
+    """Unlike rejected moves, a scored word is public — everyone (including
+    the mover) gets a pill announcing it."""
+    await repo.save_game(_state())
+    tiles = [
+        PlacedTile(row=7, col=7, letter="C"),
+        PlacedTile(row=7, col=8, letter="A"),
+        PlacedTile(row=7, col=9, letter="T"),
+    ]
+    with patch("backend_api.services.game_service.broadcaster.notify", new_callable=AsyncMock) as mock_notify:
+        await svc.apply_move("ABCD12", "p1", PlaceRequest(player_id="p1", tiles=tiles))
+    mock_notify.assert_awaited_once()
+    args, kwargs = mock_notify.call_args
+    assert args[0] == "ABCD12"
+    assert args[1] == "Alice played CAT for 10 pts"
+    assert kwargs["notif_type"] == "success"
+
+
+async def test_swap_does_not_broadcast_play_announcement(repo, svc):
+    await repo.save_game(_state())
+    with patch("backend_api.services.game_service.broadcaster.notify", new_callable=AsyncMock) as mock_notify:
+        await svc.apply_move("ABCD12", "p1", SwapRequest(player_id="p1", letters=["C", "A", "T"]))
+    mock_notify.assert_not_awaited()
+
+
+async def test_pass_does_not_broadcast_play_announcement(repo, svc):
+    await repo.save_game(_state())
+    with patch("backend_api.services.game_service.broadcaster.notify", new_callable=AsyncMock) as mock_notify:
+        await svc.apply_move("ABCD12", "p1", PassRequest(player_id="p1"))
+    mock_notify.assert_not_awaited()
+
+
 # ---------------------------------------------------------------------------
 # time bank / overtime (_time_bank_task)
 # ---------------------------------------------------------------------------

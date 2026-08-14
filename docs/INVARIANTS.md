@@ -44,7 +44,10 @@ update it in the same commit; a stale invariants doc is worse than none.
 - **Rejected-move feedback stays private to the mover.** Don't broadcast
   invalid-word/invalid-placement details (or a generic "opponent made an
   invalid move" notice) to the opponent — a move that never happened isn't
-  their business.
+  their business. **A successfully scored word is the opposite** — it's a
+  public activity pill (`"{nickname} played {WORD} for {N} pts"`) broadcast
+  to both players via `broadcaster.notify(...)` with no `skip_player_id`,
+  fired from `game_service.py::apply_move` right after the state broadcast.
 - **The four backend "seams" own one thing each — don't reintroduce ad hoc
   duplicates elsewhere:**
   - `game_manager.py` — per-game locks + turn timers
@@ -104,7 +107,7 @@ update it in the same commit; a stale invariants doc is worse than none.
 
 ## Testing / verification
 
-- **Test counts as of this doc**: `packages/backend-api` 80/80,
+- **Test counts as of this doc**: `packages/backend-api` 83/83,
   `packages/game-engine` 79/79. A sudden drop is a regression, not
   flakiness — investigate before re-running.
 - **Browser automation tooling can be flaky** (resize/screenshot timeouts
