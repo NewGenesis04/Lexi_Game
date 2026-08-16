@@ -127,26 +127,9 @@ I don't know how big this will get. Maybe it stays a personal project I play wit
 
 ### Deployment
 
-This repo includes separate Railpack configs at the project root:
+This repo includes a Railpack config for the backend:
 
-- `railpack.frontend.json` for the Vue/Vite SPA
 - `railpack.backend.json` for the FastAPI API server
-
-#### Frontend
-
-From the repo root:
-
-```bash
-railpack build --config-file ./railpack.frontend.json --name lexi-frontend .
-```
-
-The app expects the API base URL to be provided at runtime through the Vite env var:
-
-```bash
-VITE_API_BASE=https://your-api-domain
-```
-
-If you are serving the app behind a reverse proxy or a static host, make sure the frontend is configured to talk to the backend URL you expose for the FastAPI service.
 
 #### Backend
 
