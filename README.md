@@ -102,7 +102,7 @@ The architecture, visually:
                         └─────────────────────┘
 ```
 
-![Lexi Game Board](docs/screenshots/image.png)
+![Lexi System Design](docs/screenshots/lexi_system_design.png)
 
 ---
 

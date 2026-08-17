@@ -62,6 +62,11 @@ A modern, low-latency online Scrabble game. Monorepo with two packages: `game-en
 
 
 ## Disconnect & Adjournment State Machine
+
+Two-stage grace, not one. A dropped connection doesn't pause the game
+immediately — it gets a short soft-grace window first (covers refreshes,
+tab switches, flaky wifi) before the clock actually freezes.
+
                                                 ┌───────────────┐
                                                 │    CREATED    │
                                                 └───────┬───────┘
@@ -70,37 +75,67 @@ A modern, low-latency online Scrabble game. Monorepo with two packages: `game-en
                                                 ┌───────────────┐
                                                 │    PLAYING    │◄────────────────────────────────┐
                                                 └───────┬───────┘                                 │
-                                                        │                                         │
-                                        Either Player   │ Disconnect                              │ Both Players
-                                        Socket Drops    │                                         │ Reconnect
+                                                        │ Last connection for a                    │
+                                                        │ player drops                             │
                                                         ▼                                         │
                                                 ┌───────────────┐                                 │
-                                                │   ADJOURNED   │─────────────────────────────────┘
-                                                │  DISCONNECT   │ (Freeze Turn Clock -> Save Remaining Secs)
-                                                └───────┬───────┘ (Spawn 5-Min asyncio.Task)
-                                                        │
-                                                        │ Last Connected Player Drops OR
-                                                        │ 5-Min Task Expires / Opponent Left
+                                                │  SOFT GRACE   │──── Reconnects within 10s ───────┘
+                                                │ (10s asyncio  │     (disconnect check cancelled,
+                                                │     Task)     │      turn clock never froze)
+                                                └───────┬───────┘
+                                                        │ Still gone after 10s
                                                         ▼
                                                 ┌───────────────┐
-                                                │    PAUSED     │◄─── (Turn status flag to PAUSED)
+                                                │    PAUSED     │  (Freeze turn clock → paused_time_left,
+                                                │               │   spawn 5-min hard-grace asyncio.Task)
                                                 └───────┬───────┘
                                                         │
-                                                        │ 60-Sec Sweep Task checks:
-                                                        │ now() - updated_at > 30 mins
+                                        ┌───────────────┼────────────────────────┐
+                                        │ Both players   │ 5-min task expires,    │ 5-min task expires,
+                                        │ reconnect      │ exactly one connected  │ zero connected
+                                        ▼                ▼                        ▼
+                                ┌───────────────┐ ┌───────────────┐      (runtime state torn
+                                │    PLAYING     │ │   FINISHED    │       down; GameState stays
+                                │ (clock resumes │ │ (TIMEOUT move,│       PAUSED in Redis — see
+                                │  from saved     │ │  connected     │       sweep below)
+                                │  remaining)     │ │  player wins) │
+                                └───────────────┘ └───────────────┘
+                                                        │
+                                                        │ (from any PAUSED game,
+                                                        │  reconnected or not)
                                                         ▼
                                                 ┌───────────────┐
-                                                │ GARBAGE WIPE  │ ──► (Evict keys from Redis)
+                                                │  60-SEC SWEEP  │ checks every PAUSED game:
+                                                │     TASK       │ now() - paused_at > 30 min?
+                                                └───────┬───────┘
+                                                        │ yes
+                                                        ▼
+                                                ┌───────────────┐
+                                                │ GARBAGE WIPE  │ delete_game() — evicted while
+                                                │               │ still PAUSED, never FINISHED
                                                 └───────────────┘
+
+Notes:
+- A double-disconnect (both players gone when the 5-min hard grace expires)
+  does **not** resolve the game to FINISHED/draw — it just tears down
+  in-process runtime state (locks, timers, connection maps) and leaves the
+  GameState sitting in Redis as PAUSED. The 60-second sweep task
+  (`main.py::_gc_sweep`) is what actually deletes it, once `paused_at` is
+  more than 30 minutes old. A client that reconnects inside that 30-minute
+  window before the sweep runs will just resume the game normally.
+- Reconnecting at any point cancels whichever grace task is currently
+  pending for that player (soft or hard) — each new disconnect starts a
+  fresh timer of the appropriate stage.
 
 Key design bets:
 - All validation server-side in game-engine — no challenge mechanics needed
-- SSE pushes full GameState — dumb client
+- SSE pushes full GameState, plus a lightweight `notification` event type
+  for public activity pills and system messages (see Q32) — dumb client
 - Opaque bearer tokens — upgrade to JWT later
 - Per-game asyncio.Lock for mutation safety
 - Per-game asyncio.Task for time bank — no polling
 - Join-by-6-digit-code with nicknames; accounts added layer later
-- Three end conditions: spent time clock out, 6 consecutive passes, or bag empty + tile rack penalt
+- Three end conditions: spent time clock out, 6 consecutive passes, or bag empty + tile rack penalty
 
 ## Decided Design
 
@@ -117,8 +152,8 @@ Key design bets:
 **Rationale:** Correct by construction — no risk of AI-generated DAWG corruption. ~15 MB RAM per dictionary is negligible. See Q15 for full rationale.
 
 ### Q4. GameState Structure
-**Decision:** Sketch defined; details TBD during implementation. Fields include: board, bag, players, current_player_index, phase, move_history, dictionary, scores, consecutive_passes, last_move.
-**Rationale:** No limitation on tile swaps. Core fields only; extend as needed.
+**Decision:** `code, phase, dictionary, board, bag, players, current_player_index, move_history, consecutive_passes, last_move, paused_time_left, paused_at` (`game_engine/models.py::GameState`). Per-player score/rack/time live on `Player`, not on `GameState` directly. `paused_time_left`/`paused_at` were added for the disconnect state machine (Q27) — they're the only fields on the domain model that exist purely to serve a backend-lifecycle concern rather than Scrabble rules.
+**Rationale:** No limitation on tile swaps. Core fields only; extended twice since the original sketch (pause bookkeeping, move history) rather than pre-built.
 
 ### Q5. Game Joining
 **Decision:** Invite code — 6-character alphanumeric. Creator shares code out-of-band.
@@ -133,7 +168,7 @@ Key design bets:
 **Rationale:** Standard tournament rules. "Low-latency" means fast games.
 
 ### Q8. SSE Channel Design
-**Decision:** Single SSE connection per session (one EventSource). Multiplexed by game_id internally. Full GameState pushed on each event.
+**Decision:** Single SSE connection per session (one EventSource). Multiplexed by game_id internally. Full GameState pushed on most events; a second lightweight `notification` message shape shares the same connection for events that aren't state changes (see Q32).
 **Rationale:** One EventSource is simpler client-side. Full state push eliminates extra round-trip — 5–8 KB is negligible bandwidth.
 
 ### Q9. Redis Role
@@ -263,17 +298,21 @@ Blanks include `"letter": " ", "plays_as": "T"`. Engine validates adjacency, con
 **Decision:** A `sanitize_game_state(raw, requesting_player_id)` function strips the opponent's rack before data reaches **both** the HTTP response and the SSE broadcast. The SSE manager broadcasts per-recipient (one sanitized payload per player, not one raw broadcast).
 **Rationale:** Prevents rack leakage through either channel. If raw GameState is accidentally logged or broadcast, opponent tiles are never in the payload.
 
-### Q27. Disconnect State Machine — 5-Minute Grace Period
-**Decision:** Any disconnect (by either player) immediately freezes the active turn clock and triggers a 5-minute grace period. Game enters `PAUSED` state. Both players must reconnect for the game to resume. If 5 minutes elapse without full reconnection, forfeit: if exactly one player is online, they win; if both are offline, the game is garbage-collected as a draw after 30 minutes. On reconnect, the frozen clock resumes from `paused_time_left` (stored in Redis alongside `game:{code}`).
-**Rationale:** Simplifies the state machine — no distinction between "current player disconnected" vs "opponent disconnected during your turn." Eliminates clock-race conditions.
+### Q27. Disconnect State Machine — Two-Stage Grace
+**Decision:** A dropped connection first gets a 10-second soft-grace window (`ConnectionLifecycle._pause_after_grace`) — if the player reconnects inside it, nothing happens: the turn clock never froze and no state changed. Only if they're still gone after 10s does the game actually pause: the active turn clock freezes (`paused_time_left` written to Redis), phase flips to `PAUSED`, and a 5-minute hard-grace task starts (`_disconnect_grace_task`). Both players must be connected for the game to resume. If the 5 minutes expire: exactly one player connected → they win outright (a `TIMEOUT` move is recorded, phase → `FINISHED`); zero players connected → the game is left `PAUSED` in Redis and picked up by the 30-minute sweep (Q28) instead of being resolved immediately.
+**Rationale:** The 10s soft grace absorbs refreshes/tab-switches/flaky wifi without ever touching the clock or notifying the opponent — a real disconnect is the only thing that should cost turn time. Splitting soft/hard grace still avoids the "current player disconnected vs opponent disconnected" distinction Q27 originally aimed for — both players are held to the same two-stage timeline regardless of whose turn it is.
 
 ### Q28. Double Disconnect
-**Decision:** When both players are disconnected, the game remains in `PAUSED` state. A background sweep task checks for paused games older than 30 minutes and garbage-collects them as draws.
-**Rationale:** No double-timer conflict. Games can't linger in Redis forever.
+**Decision:** When the 5-minute hard grace expires with both players still disconnected, the game is **not** resolved to `FINISHED` — it stays `PAUSED` in Redis; only the in-process runtime state (locks, timers, connection maps) is torn down. A background sweep task (`main.py::_gc_sweep`, every 60s) deletes any `PAUSED` game whose `paused_at` is more than 30 minutes old. A game in this window is still resumable if both players come back before the sweep runs.
+**Rationale:** No double-timer conflict, and no need to synthesize a "draw" outcome for a game nobody was present to finish — deletion is honest about what actually happened (nobody showed up), rather than writing a fake result to history.
 
 ### Q29. Disconnect Timer Semantics
-**Decision:** Each disconnect event gets a fresh 5-minute timer.
+**Decision:** Each disconnect event gets a fresh timer at whichever stage is active — a fresh 10s soft grace if the game is still `PLAYING`, or a fresh 5-minute hard grace if it's already `PAUSED`. Reconnecting cancels the pending task for that player.
 **Rationale:** Simplest to reason about. Prevents "second disconnect has a tighter clock" confusion.
+
+### Q32. SSE Message Protocol — State Pushes vs. Notifications
+**Decision:** The SSE stream carries two distinct JSON shapes. Most pushes are a full sanitized `GameStateOut` (as in Q8). A second shape, `{"type": "notification", "payload": {"text": str, "type": "success"|"info"|"warning"|"error"}}`, carries lightweight, non-state messages: public activity pills for a scored word/swap/pass (`game_service.py::apply_move`, broadcast to both players including the mover), and system messages like overtime strikes, pause/resume, and win-by-forfeit (derived client-side in `store.ts::updateLocalState` by diffing the previous and incoming `GameStateOut`, not sent as separate server events). The store's SSE handler branches on `msg.type` before deciding whether to call `updateLocalState` or just push a toast.
+**Rationale:** A full-state broadcast has nowhere to carry a transient, per-event string like "Alex played ZEBRA for 42 pts" — it's not a field of `GameState`, it's an event. Reusing the one `EventSource` connection for both keeps Q8's "one connection, multiplexed internally" decision intact rather than opening a second channel.
 
 ### Q30. Reconnect UX
 **Decision:** On SSE re-establish, the server pushes `game_paused` event (if game is still paused) or `game_resumed` (if both players are back) over the fresh connection. No polling — the SSE stream is the source of truth.
