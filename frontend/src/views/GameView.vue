@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '../stores/game'
 import { usePendingMove } from '../composables/usePendingMove'
@@ -117,8 +117,31 @@ const endReason = computed<'forfeit' | 'timeout' | 'normal'>(() => {
 })
 
 function handlePlaceTile(row: number, col: number) {
+  if (store.phase !== 'playing') return
   tryPlaceTile(row, col, myRack.value)
 }
+
+function handleSelectTile(index: number) {
+  if (store.phase !== 'playing') return
+  selectRackTile(index)
+}
+
+function handleRemoveGhost(row: number, col: number) {
+  if (store.phase !== 'playing') return
+  tryRemoveGhost(row, col)
+}
+
+function handleSetBlankLetter(row: number, col: number, letter: string) {
+  if (store.phase !== 'playing') return
+  setBlankLetter(row, col, letter)
+}
+
+watch(
+  () => store.phase,
+  (phase) => {
+    if (phase === 'finished') reset()
+  },
+)
 
 async function handleSubmit() {
   const payload = buildMovePayload(myRack.value)
@@ -298,8 +321,8 @@ function handlePlayAgain() {
           :ghost-letter-at="ghostLetterAt"
           :has-selection="selectedRackIndex !== null"
           @place-tile="handlePlaceTile"
-          @remove-ghost="tryRemoveGhost"
-          @set-blank-letter="setBlankLetter"
+          @remove-ghost="handleRemoveGhost"
+          @set-blank-letter="handleSetBlankLetter"
         />
         <TileRack
           :tiles="myRack"
@@ -307,7 +330,7 @@ function handlePlayAgain() {
           :placed-indices="placedIndices"
           :swap-mode="swapMode"
           :swap-indices="swapIndices"
-          @select-tile="selectRackTile"
+          @select-tile="handleSelectTile"
         />
         <MoveControls
           v-if="store.isMyTurn && store.phase === 'playing'"
@@ -354,7 +377,7 @@ function handlePlayAgain() {
     />
 
     <LeaveConfirmCard
-      v-if="showLeaveConfirm"
+      v-if="showLeaveConfirm && store.phase === 'playing'"
       :opponent-nickname="opponentNickname"
       @confirm="handleLeave"
       @cancel="showLeaveConfirm = false"
