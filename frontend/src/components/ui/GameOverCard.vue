@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import type { PlayerOut } from '../../types/game'
 import { AVATARS } from '../../constants/avatars'
 
@@ -11,7 +11,14 @@ const props = defineProps<{
   players: PlayerOut[]
 }>()
 
-const emit = defineEmits<{ 'play-again': [] }>()
+const emit = defineEmits<{ 'play-again': []; dismiss: [] }>()
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') emit('dismiss')
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 const winnerName = computed(() => props.winner?.nickname ?? 'OPPONENT')
 
@@ -49,7 +56,10 @@ function avatarSrc(p: PlayerOut): string | null {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-lexi-overlay">
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-lexi-overlay"
+    @click.self="emit('dismiss')"
+  >
     <div
       class="lexi-fade-in w-full max-w-sm bg-lexi-overlay-card border-lexi border-lexi-overlay-border border-t-4 shadow-lexi-lg p-8"
       :style="{ borderTopColor: accentColor }"

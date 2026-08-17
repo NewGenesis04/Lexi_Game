@@ -11,6 +11,7 @@ import MoveControls from '../components/ui/MoveControls.vue'
 import BoardBanner from '../components/ui/BoardBanner.vue'
 import GameOverCard from '../components/ui/GameOverCard.vue'
 import GamePausedCard from '../components/ui/GamePausedCard.vue'
+import LeaveConfirmCard from '../components/ui/LeaveConfirmCard.vue'
 import MoveHistorySidebar from '../components/ui/MoveHistorySidebar.vue'
 import bagImg from '../assets/bag.svg'
 import { useTheme } from '../composables/useTheme'
@@ -41,6 +42,8 @@ const { theme, toggle } = useTheme()
 const code = route.params.code as string
 const submitting = ref(false)
 const historyOpen = ref(false)
+const showLeaveConfirm = ref(false)
+const resultsOpen = ref(true)
 const myRack = computed(() => store.myPlayer?.rack ?? [])
 const myBoard = computed<(string | null)[][]>(() => store.game?.board ?? [])
 
@@ -104,6 +107,8 @@ const isDraw = computed(() =>
 
 const iAmWinner = computed(() => winner.value?.id === store.session?.player_id)
 
+const opponentNickname = computed(() => store.opponent?.nickname ?? 'opponent')
+
 const endReason = computed<'forfeit' | 'timeout' | 'normal'>(() => {
   const t = store.game?.last_move?.type
   if (t === 'forfeit') return 'forfeit'
@@ -149,6 +154,7 @@ async function handleForfeit() {
 }
 
 async function handleLeave() {
+  showLeaveConfirm.value = false
   if (store.phase === 'playing') {
     try {
       await store.forfeit(code)
@@ -214,6 +220,15 @@ function handlePlayAgain() {
           RULES
         </a>
 
+        <!-- Result button (re-open the finished card after dismissing) -->
+        <button
+          v-if="store.phase === 'finished' && !resultsOpen"
+          class="px-2 py-1 lg:px-3 lg:py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-text-secondary border-lexi border-lexi-border-muted shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:text-lexi-text hover:border-lexi-border hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
+          @click="resultsOpen = true"
+        >
+          RESULT
+        </button>
+
         <!-- History button -->
         <button
           class="px-2 py-1 lg:px-3 lg:py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-text-secondary border-lexi border-lexi-border-muted shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:text-lexi-text hover:border-lexi-border hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
@@ -225,7 +240,7 @@ function handlePlayAgain() {
         <!-- Leave button -->
         <button
           class="px-2 py-1 lg:px-3 lg:py-1.5 font-lexi-ui text-lexi-xs font-black tracking-lexi-wide uppercase text-lexi-danger border-lexi border-lexi-danger shadow-lexi-sm cursor-pointer transition-all duration-lexi-base hover:shadow-lexi-md hover:-translate-x-px hover:-translate-y-px active:shadow-lexi-pressed active:translate-x-0.5 active:translate-y-0.5"
-          @click="handleLeave"
+          @click="showLeaveConfirm = true"
         >
           LEAVE
         </button>
@@ -328,13 +343,21 @@ function handlePlayAgain() {
     />
 
     <GameOverCard
-      v-if="store.phase === 'finished'"
+      v-if="store.phase === 'finished' && resultsOpen"
       :i-am-winner="iAmWinner"
       :end-reason="endReason"
       :winner="winner"
       :draw="isDraw"
       :players="store.game?.players ?? []"
       @play-again="handlePlayAgain"
+      @dismiss="resultsOpen = false"
+    />
+
+    <LeaveConfirmCard
+      v-if="showLeaveConfirm"
+      :opponent-nickname="opponentNickname"
+      @confirm="handleLeave"
+      @cancel="showLeaveConfirm = false"
     />
 
     <MoveHistorySidebar
