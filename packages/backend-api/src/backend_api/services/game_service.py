@@ -163,19 +163,29 @@ class GameService:
             payloads = broadcaster.serialize(state, lifecycle.connected_map(code))
             self._start_timer(state)
 
-            play_announcement: str | None = None
-            if state.last_move is not None and state.last_move.type == MoveType.PLACE:
+            announcement: str | None = None
+            notif_type = "success"
+            if state.last_move is not None:
                 mover = next((p for p in state.players if p.id == player_id), None)
-                if mover is not None and state.last_move.words:
-                    word = state.last_move.words[0].upper()
-                    play_announcement = f"{mover.nickname} played {word} for {state.last_move.score_delta} pts"
+                if mover is not None:
+                    move = state.last_move
+                    if move.type == MoveType.PLACE and move.words:
+                        word = move.words[0].upper()
+                        announcement = f"{mover.nickname} played {word} for {move.score_delta} pts"
+                    elif move.type == MoveType.SWAP:
+                        n = len(move.letters)
+                        announcement = f"{mover.nickname} swapped {n} tile{'s' if n != 1 else ''}"
+                        notif_type = "info"
+                    elif move.type == MoveType.PASS:
+                        announcement = f"{mover.nickname} passed"
+                        notif_type = "info"
 
         if payloads:
             await sse_manager.broadcast(payloads)
-        if play_announcement:
+        if announcement:
             # Broadcast to everyone, including the mover — this is a public
             # activity pill, not the private rejected-move feedback above.
-            await broadcaster.notify(code, play_announcement, notif_type="success")
+            await broadcaster.notify(code, announcement, notif_type=notif_type)
         return self._to_view(state, viewer_id=player_id)
 
     async def forfeit(self, code: str, player_id: str) -> GameStateOut:

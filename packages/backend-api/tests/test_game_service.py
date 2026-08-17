@@ -585,18 +585,29 @@ async def test_successful_place_broadcasts_play_announcement(repo, svc):
     assert kwargs["notif_type"] == "success"
 
 
-async def test_swap_does_not_broadcast_play_announcement(repo, svc):
+async def test_swap_broadcasts_swap_announcement(repo, svc):
+    """A swap is public (the action, not its letters) — everyone including
+    the mover gets a pill announcing it."""
     await repo.save_game(_state())
     with patch("backend_api.services.game_service.broadcaster.notify", new_callable=AsyncMock) as mock_notify:
         await svc.apply_move("ABCD12", "p1", SwapRequest(player_id="p1", letters=["C", "A", "T"]))
-    mock_notify.assert_not_awaited()
+    mock_notify.assert_awaited_once()
+    args, kwargs = mock_notify.call_args
+    assert args[0] == "ABCD12"
+    assert args[1] == "Alice swapped 3 tiles"
+    assert kwargs["notif_type"] == "info"
 
 
-async def test_pass_does_not_broadcast_play_announcement(repo, svc):
+async def test_pass_broadcasts_pass_announcement(repo, svc):
+    """A pass is public — everyone including the mover gets a pill."""
     await repo.save_game(_state())
     with patch("backend_api.services.game_service.broadcaster.notify", new_callable=AsyncMock) as mock_notify:
         await svc.apply_move("ABCD12", "p1", PassRequest(player_id="p1"))
-    mock_notify.assert_not_awaited()
+    mock_notify.assert_awaited_once()
+    args, kwargs = mock_notify.call_args
+    assert args[0] == "ABCD12"
+    assert args[1] == "Alice passed"
+    assert kwargs["notif_type"] == "info"
 
 
 # ---------------------------------------------------------------------------
