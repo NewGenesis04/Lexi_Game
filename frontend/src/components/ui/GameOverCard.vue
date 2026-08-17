@@ -7,6 +7,7 @@ const props = defineProps<{
   iAmWinner: boolean
   endReason: 'forfeit' | 'timeout' | 'normal'
   winner: PlayerOut | null
+  draw: boolean
   players: PlayerOut[]
 }>()
 
@@ -15,24 +16,28 @@ const emit = defineEmits<{ 'play-again': [] }>()
 const winnerName = computed(() => props.winner?.nickname ?? 'OPPONENT')
 
 const heading = computed(() => {
+  if (props.draw) return 'TIE'
   if (props.iAmWinner) return 'YOU WON'
   if (props.endReason === 'timeout' || props.endReason === 'forfeit') return `${winnerName.value} WON!`
   return 'YOU LOST'
 })
 
 const subLabel = computed(() => {
+  if (props.draw) return 'GAME OVER'
   if (props.endReason === 'timeout') return props.iAmWinner ? 'TIME OUT' : 'TIMED OUT'
   if (props.endReason === 'forfeit') return 'FORFEITED'
   return 'GAME OVER'
 })
 
 const accentColor = computed(() => {
+  if (props.draw) return 'var(--color-lexi-warning)'
   if (props.iAmWinner) return 'var(--color-lexi-primary)'
   if (props.endReason === 'timeout') return 'var(--color-lexi-warning)'
   return 'var(--color-lexi-danger)'
 })
 
 const headingClass = computed(() => {
+  if (props.draw) return 'text-lexi-warning'
   if (props.iAmWinner) return 'text-lexi-primary'
   if (props.endReason === 'timeout') return 'text-lexi-warning'
   return 'text-lexi-danger'
@@ -81,7 +86,7 @@ function avatarSrc(p: PlayerOut): string | null {
           <span
             :class="[
               'font-lexi-numeric text-lexi-xl font-bold lexi-numeric',
-              winner?.id === p.id ? headingClass : 'text-lexi-text-muted'
+              draw || winner?.id === p.id ? headingClass : 'text-lexi-text-muted'
             ]"
           >
             {{ p.score }}

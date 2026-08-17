@@ -20,11 +20,6 @@ const router = createRouter({
       name: 'rules',
       component: () => import('../views/RulesView.vue'),
     },
-    {
-      path: '/prototype/ui',
-      name: 'prototype-ui',
-      component: () => import('../views/PrototypeUI.vue'),
-    },
   ],
 })
 

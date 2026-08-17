@@ -192,3 +192,7 @@ lexi/
     ├── FRONTEND.md         # Frontend decisions (FQ1–FQ13)
     └── UI_DESIGN_BRIEF.md  # Complete design reference
 ```
+
+### TODO
+
+- **Board screenshot memory.** When a game ends, let the user copy or download a shareable snapshot of the final board — scores and player names included. Could render the actual board (e.g. `html-to-image`/Canvas capture) or a custom stylized end-of-game card. A keepsake, not just stats.

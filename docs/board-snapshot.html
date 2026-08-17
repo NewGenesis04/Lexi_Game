@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lexi — Board Snapshot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --page: #1A1A1A;
+      --card: #252525;
+      --sunk: #0F0F0F;
+      --border: #E5E5E5;
+      --border-muted: #333333;
+      --text: #E5E5E5;
+      --text-secondary: #AAAAAA;
+      --text-muted: #777777;
+      --accent: #FFE600;
+      --keycap: #F1F5F9;
+      --ink: #0F172A;
+      --points: #475569;
+      --gridline: #1F2937;
+      --board: #0B0F19;
+      --empty: #0D1117;
+      --shadow-sm: 3px 3px 0 var(--border);
+      --shadow-md: 4px 4px 0 var(--border);
+      --shadow-lg: 6px 6px 0 var(--border);
+      --shadow-pressed: 1px 1px 0 var(--border);
+      --shadow-cta: 4px 4px 0 #000000;
+      --shadow-cta-lg: 6px 6px 0 #000000;
+      --shadow-cta-pressed: 1px 1px 0 #000000;
+      --dl: #06B6D4; --dl-stroke: #0590A8;
+      --tl: #F59E0B; --tl-stroke: #C17D09;
+      --dw: #10B981; --dw-stroke: #0B8F63;
+      --tw: #FF3366; --tw-stroke: #C81F4D;
+      --star: #FFE600; --star-stroke: #CCB800;
+      --ui: 'Space Mono', 'Courier New', monospace;
+      --display: 'EB Garamond', Georgia, serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--page); color: var(--text); min-height: 100vh; }
+    body { font-family: var(--ui); -webkit-font-smoothing: antialiased; }
+
+    .screen {
+      max-width: 720px; margin: 32px auto;
+      padding: 32px 32px 28px;
+      background: var(--card);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* Header */
+    .header {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+    }
+    .game-meta {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+      color: var(--text-muted); text-transform: uppercase; white-space: nowrap;
+    }
+    .header-actions { display: flex; gap: 10px; }
+    .btn {
+      font-family: var(--ui); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 10px 14px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 2px solid var(--border);
+      transition: box-shadow .1s ease, transform .1s ease;
+    }
+    .btn-primary {
+      background: var(--keycap); color: var(--ink);
+      border-color: var(--border);
+      box-shadow: var(--shadow-cta);
+    }
+    .btn-ghost {
+      background: transparent; color: var(--text);
+      box-shadow: var(--shadow-sm);
+    }
+    .btn:hover { transform: translate(-1px, -1px); }
+    .btn-primary:hover { box-shadow: var(--shadow-cta-lg); }
+    .btn-ghost:hover { box-shadow: var(--shadow-md); }
+    .btn:active { transform: translate(2px, 2px); }
+    .btn-primary:active { box-shadow: var(--shadow-cta-pressed); }
+    .btn-ghost:active { box-shadow: var(--shadow-pressed); }
+
+    /* Winner */
+    .winner {
+      margin: 28px 0 20px;
+      font-family: var(--display); font-size: 34px; font-weight: 500;
+      color: var(--accent); letter-spacing: -0.01em;
+    }
+
+    /* Player panels */
+    .players { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .panel {
+      background: var(--sunk);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      padding: 14px 18px;
+    }
+    .panel-name {
+      display: flex; align-items: baseline; gap: 10px;
+      font-size: 16px; font-weight: 700; letter-spacing: 0.1em;
+      color: var(--text);
+    }
+    .panel-score {
+      margin-top: 8px;
+      font-size: 44px; font-weight: 700; letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums; line-height: 1;
+      color: var(--text);
+    }
+
+    /* Board */
+    .board-frame { padding: 4px 0; }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(15, 26px);
+      grid-template-rows: repeat(15, 26px);
+      gap: 2px;
+      background: var(--board);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow-md);
+      width: max-content;
+      margin: 0 auto;
+    }
+    .cell {
+      width: 26px; height: 26px;
+      position: relative;
+      background: var(--empty);
+      border: 1px solid var(--gridline);
+      font-family: var(--ui);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cell.premium { font-size: 9px; font-weight: 700; color: var(--ink); }
+    .cell.dl  { background: var(--dl);  border-color: var(--dl-stroke); }
+    .cell.tl  { background: var(--tl);  border-color: var(--tl-stroke); }
+    .cell.dw  { background: var(--dw);  border-color: var(--dw-stroke); color: #F1F5F9; }
+    .cell.tw  { background: var(--tw);  border-color: var(--tw-stroke); color: #F1F5F9; }
+    .cell.star{ background: var(--star); border-color: var(--star-stroke); }
+    .cell.tile {
+      background: var(--keycap);
+      border: 2px solid var(--ink);
+      box-shadow: var(--shadow-sm);
+      color: var(--ink);
+      font-size: 15px; font-weight: 700;
+    }
+    .cell.tile .pts {
+      position: absolute; right: 2px; bottom: 1px;
+      font-size: 7px; font-weight: 700; color: var(--points);
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 24px; text-align: center;
+      font-size: 12px; letter-spacing: 0.08em; color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <header class="header">
+      <div class="game-meta">Lexi · Game XY7K9M · TWL06 · Feb 16 2026</div>
+      <div class="header-actions">
+        <button class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Download
+        </button>
+        <button class="btn btn-ghost">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          Copy
+        </button>
+      </div>
+    </header>
+
+    <div class="winner">Neo takes the game — 512 to 478</div>
+
+    <div class="players">
+      <div class="panel">
+        <div class="panel-name">NEO</div>
+        <div class="panel-score">512</div>
+      </div>
+      <div class="panel">
+        <div class="panel-name">JAX</div>
+        <div class="panel-score">478</div>
+      </div>
+    </div>
+
+    <div class="board-frame">
+      <div class="board" id="board"></div>
+    </div>
+
+    <div class="footer">Thanks for playing · play at lexigame.app</div>
+  </div>
+
+  <script>
+    const PREM = {
+      1: ['dl', 'DL'], 2: ['dw', 'DW'], 3: ['tw', 'TW'], 4: ['tl', 'TL'], 5: ['star', '★']
+    };
+    const MAP = [
+      [3,0,0,1,0,0,0,3,0,0,0,1,0,0,3],
+      [0,2,0,0,0,4,0,0,0,4,0,0,0,2,0],
+      [0,0,2,0,0,0,4,0,4,0,0,0,2,0,0],
+      [1,0,0,2,0,0,0,1,0,0,0,2,0,0,1],
+      [0,0,0,0,2,0,0,0,0,0,2,0,0,0,0],
+      [0,4,0,0,0,4,0,0,0,4,0,0,0,4,0],
+      [0,0,4,0,0,0,4,0,4,0,0,0,4,0,0],
+      [3,0,0,1,0,0,0,5,0,0,0,1,0,0,3],
+      [0,0,4,0,0,0,4,0,4,0,0,0,4,0,0],
+      [0,4,0,0,0,4,0,0,0,4,0,0,0,4,0],
+      [0,0,0,0,2,0,0,0,0,0,2,0,0,0,0],
+      [1,0,0,2,0,0,0,1,0,0,0,2,0,0,1],
+      [0,0,2,0,0,0,4,0,4,0,0,0,2,0,0],
+      [0,2,0,0,0,4,0,0,0,4,0,0,0,2,0],
+      [3,0,0,1,0,0,0,3,0,0,0,1,0,0,3]
+    ];
+    const TILES = {
+      '7,5':['S',1],'7,6':['T',1],'7,7':['A',1],'7,8':['R',1],'7,9':['E',1],
+      '4,7':['Q',10],'5,7':['U',1],'6,7':['I',1],'8,7':['T',1],'9,7':['E',1],
+      '12,3':['S',1],'12,4':['U',1],'12,5':['N',1],
+      '2,11':['D',2],'3,11':['O',1],'4,11':['G',2]
+    };
+    const board = document.getElementById('board');
+    for (let r = 0; r < 15; r++) {
+      for (let c = 0; c < 15; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        const tile = TILES[r + ',' + c];
+        if (tile) {
+          cell.classList.add('tile');
+          cell.textContent = tile[0];
+          const pts = document.createElement('span');
+          pts.className = 'pts';
+          pts.textContent = tile[1];
+          cell.appendChild(pts);
+        } else if (MAP[r][c]) {
+          const [cls, label] = PREM[MAP[r][c]];
+          cell.classList.add('premium', cls);
+          cell.textContent = label;
+        }
+        board.appendChild(cell);
+      }
+    }
+  </script>
+</body>
+</html>

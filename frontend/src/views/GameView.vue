@@ -91,8 +91,16 @@ const winner = computed(() => {
   if (last?.type === 'forfeit' || last?.type === 'timeout') {
     return store.game.players.find(p => p.id !== last.player_id) ?? null
   }
+  if (isDraw.value) return null
   return [...store.game.players].sort((a, b) => b.score - a.score)[0] ?? null
 })
+
+const isDraw = computed(() =>
+  store.game?.phase === 'finished' &&
+  endReason.value === 'normal' &&
+  store.game.players.length === 2 &&
+  store.game.players[0].score === store.game.players[1].score
+)
 
 const iAmWinner = computed(() => winner.value?.id === store.session?.player_id)
 
@@ -324,6 +332,7 @@ function handlePlayAgain() {
       :i-am-winner="iAmWinner"
       :end-reason="endReason"
       :winner="winner"
+      :draw="isDraw"
       :players="store.game?.players ?? []"
       @play-again="handlePlayAgain"
     />
