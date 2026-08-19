@@ -78,7 +78,12 @@ update it in the same commit; a stale invariants doc is worse than none.
 - **Session lives in `localStorage`, shared per-origin across every tab of
   the same browser.** Testing two players locally requires two separate
   browser profiles (or one regular + one incognito window) — two tabs of
-  one browser will silently collide.
+  one browser share a token and still collide. `sse_manager` now keeps one
+  queue *per connection*, so a second tab no longer starves the first of
+  broadcasts, but `connection_lifecycle` still keys connections per player:
+  closing one of two same-browser tabs marks that player offline and can
+  trigger a grace pause. Fixing that needs per-connection identities in the
+  lifecycle map.
 - **Theming is CSS-custom-property based, keyed off `[data-theme="light"|
   "dark"]` in `lexi.css`** — not Tailwind's `dark:` variant, which isn't
   configured for attribute-based switching anywhere in this codebase. To
@@ -107,7 +112,7 @@ update it in the same commit; a stale invariants doc is worse than none.
 
 ## Testing / verification
 
-- **Test counts as of this doc**: `packages/backend-api` 83/83,
+- **Test counts as of this doc**: `packages/backend-api` 93/93,
   `packages/game-engine` 79/79. A sudden drop is a regression, not
   flakiness — investigate before re-running.
 - **Browser automation tooling can be flaky** (resize/screenshot timeouts

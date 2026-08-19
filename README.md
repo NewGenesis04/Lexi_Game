@@ -77,31 +77,6 @@ The engine is a separate Python package (`game-engine`) with no dependencies. It
 
 The architecture, visually:
 
-```
-                        ┌──────────────────────────────────┐
-                        │          Browser (SPA)            │
-                        │    Vue 3 · Pinia · Tailwind      │
-                        │    EventSource ◄── SSE           │
-                        │    POST ──► HTTP                 │
-                        └───────────┬──────────────────────┘
-                                    │
-            ┌───────────────────────┼───────────────────────┐
-            │        FastAPI (Docker)                       │
-            │           routes/ → services/ → repos/        │
-            │               ┌──────────────┐                │
-            │               │ game-engine  │                │
-            │               │ (pure logic) │                │
-            │               └──────────────┘                │
-            │        SSE Manager (in-process)               │
-            └───────────────────────┼───────────────────────┘
-                                    │
-                        ┌──────────┴──────────┐
-                        │      Redis           │
-                        │  game:{code}         │
-                        │  session:{token}     │
-                        └─────────────────────┘
-```
-
 ![Lexi System Design](docs/screenshots/lexi_system_design.png)
 
 ---

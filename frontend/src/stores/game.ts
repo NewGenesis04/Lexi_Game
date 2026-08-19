@@ -37,6 +37,8 @@ export const useGameStore = defineStore('game', () => {
   const toasts = ref<ToastMessage[]>([])
   let sseConnection: SSEConnection | null = null
   let previousOvertimeCounts: Record<string, number> = {}
+  let pollTimer: ReturnType<typeof setInterval> | null = null
+  let pollInFlight = false
 
   const phase = computed<GamePhase>(() => game.value?.phase ?? 'created')
 
@@ -168,7 +170,38 @@ export const useGameStore = defineStore('game', () => {
     connected.value = true
   }
 
+  const POLL_INTERVAL_MS = 20_000
+
+  // A heartbeat, not a source of truth: the server is still authoritative and
+  // SSE still does the real-time work. This just re-fetches often enough that
+  // the turn indicator and clock anchor self-heal if a stream dies silently
+  // (proxy timeout, sleeping laptop, a browser that never fires onerror).
+  function startPolling(code: string) {
+    stopPolling()
+    pollTimer = setInterval(async () => {
+      if (phase.value === 'finished' || pollInFlight || !session.value) return
+      pollInFlight = true
+      try {
+        await fetchGameState(code)
+      } catch {
+        // Silent by design — a failed heartbeat is not something to interrupt
+        // the player about, and the next tick will try again.
+      } finally {
+        pollInFlight = false
+      }
+    }, POLL_INTERVAL_MS)
+  }
+
+  function stopPolling() {
+    if (pollTimer !== null) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
+    pollInFlight = false
+  }
+
   function disconnectSSE() {
+    stopPolling()
     if (sseConnection) {
       sseConnection.close()
       sseConnection = null
@@ -203,6 +236,8 @@ export const useGameStore = defineStore('game', () => {
     forfeit,
     connectSSEStream,
     disconnectSSE,
+    startPolling,
+    stopPolling,
     reset,
   }
 })

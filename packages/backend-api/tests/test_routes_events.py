@@ -145,7 +145,49 @@ async def test_unsubscribe_and_disconnect_player_called_on_disconnect():
                 with pytest.raises(StopAsyncIteration):
                     await gen.__anext__()
 
-            mock_unsub.assert_called_once_with("ABCD12", "tok123")
+            mock_unsub.assert_called_once()
+            # The generator hands back the queue it holds, so only its own
+            # connection is dropped.
+            args = mock_unsub.call_args.args
+            assert args[:2] == ("ABCD12", "tok123")
+            assert isinstance(args[2], asyncio.Queue)
             mock_disconnect.assert_awaited_once()
+    finally:
+        sse_manager.unsubscribe("ABCD12", "tok123")
+
+
+# ---------------------------------------------------------------------------
+# Multi-tab: one token, many connections
+# ---------------------------------------------------------------------------
+
+async def test_two_connections_on_one_token_both_receive_broadcast():
+    q1 = sse_manager.subscribe("ABCD12", "tok123", "p1")
+    q2 = sse_manager.subscribe("ABCD12", "tok123", "p1")
+    try:
+        assert q1 is not q2
+        await sse_manager.broadcast({"tok123": '{"move": "pass"}'})
+        assert q1.get_nowait() == '{"move": "pass"}'
+        assert q2.get_nowait() == '{"move": "pass"}'
+    finally:
+        sse_manager.unsubscribe("ABCD12", "tok123")
+
+
+async def test_unsubscribing_one_connection_leaves_the_other_receiving():
+    q1 = sse_manager.subscribe("ABCD12", "tok123", "p1")
+    q2 = sse_manager.subscribe("ABCD12", "tok123", "p1")
+    try:
+        sse_manager.unsubscribe("ABCD12", "tok123", q1)
+
+        # The token is still registered — the player has a live tab.
+        assert sse_manager.tokens_for_game("ABCD12") == {"tok123"}
+        assert sse_manager.player_id_for_token("tok123") == "p1"
+
+        await sse_manager.broadcast({"tok123": '{"move": "pass"}'})
+        assert q2.get_nowait() == '{"move": "pass"}'
+        assert q1.empty()
+
+        sse_manager.unsubscribe("ABCD12", "tok123", q2)
+        assert sse_manager.tokens_for_game("ABCD12") == set()
+        assert sse_manager.player_id_for_token("tok123") is None
     finally:
         sse_manager.unsubscribe("ABCD12", "tok123")

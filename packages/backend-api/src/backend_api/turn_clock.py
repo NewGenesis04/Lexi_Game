@@ -31,6 +31,12 @@ class TurnClock:
     def clear(self, code: str) -> None:
         self._turn_started_at.pop(code, None)
 
+    def live_remaining(self, player: Player, code: str) -> float:
+        """The active player's bank as of *now* — stored time minus the
+        in-flight turn. Measurement stays in this one home, so views never
+        re-derive it from a wall clock of their own."""
+        return max(0.0, player.time_remaining_secs - self.elapsed(code))
+
     def apply_elapsed(self, player: Player, elapsed_secs: float) -> bool:
         """Delegates to the engine's pure overtime math (one home for the rules)."""
         return _engine_apply_elapsed(player, elapsed_secs)

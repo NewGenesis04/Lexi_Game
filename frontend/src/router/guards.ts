@@ -18,6 +18,7 @@ export async function gameGuard(
   try {
     await store.fetchGameState(code)
     store.connectSSEStream()
+    store.startPolling(code)
   } catch (err) {
     if (err instanceof ApiRequestError && err.status === 404) {
       store.addToast('Game not found — it may have ended or been removed.', 'error')

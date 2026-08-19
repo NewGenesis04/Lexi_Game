@@ -72,7 +72,7 @@ async def _event_generator(
             else:
                 yield f"data: {payload}\n\n"
     finally:
-        sse_manager.unsubscribe(code, token)
+        sse_manager.unsubscribe(code, token, queue)
         try:
             await svc.disconnect_player(code, session.player_id, token)
         except Exception:

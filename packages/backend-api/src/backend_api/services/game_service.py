@@ -287,9 +287,13 @@ class GameService:
 
             logger.warning(f"Game {code}: OT·{player.overtime_count} granted to {player.nickname} (-10 pts) via timer")
             await self._repo.save_game(state)
+            # Re-anchor before broadcasting: the OT grant resets the bank to 60s,
+            # and the view serializes bank − elapsed. Against the stale anchor
+            # that elapsed is the whole turn just spent, so the grant would go
+            # out as ~0s remaining. Re-anchor, never clear (invariant preserved).
+            turn_clock.clock.mark_turn_started(code)
             await broadcaster.broadcast(state, lifecycle.connected_map(code))
             task = asyncio.create_task(
                 self._time_bank_task(code, player_id, 60.0)
             )
-            turn_clock.clock.mark_turn_started(code)
             game_manager.set_timer(code, task)

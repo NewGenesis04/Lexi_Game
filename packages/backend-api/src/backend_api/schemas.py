@@ -8,6 +8,8 @@ from game_engine.models import (
     Dictionary, GamePhase, Move, MoveType, GameState, PlacedTile, Player, Tile,
 )
 
+from backend_api import turn_clock
+
 
 # ---------------------------------------------------------------------------
 # Inbound
@@ -119,12 +121,24 @@ class PlayerOut(BaseModel):
     avatar: str | None = None
 
     @classmethod
-    def from_domain(cls, player: Player, *, is_self: bool, connected: bool = False) -> PlayerOut:
+    def from_domain(
+        cls,
+        player: Player,
+        *,
+        is_self: bool,
+        connected: bool = False,
+        time_remaining_secs: float | None = None,
+    ) -> PlayerOut:
+        """time_remaining_secs overrides the stored bank — GameStateOut passes
+        the live value for whoever's turn it is, so a mid-turn fetch doesn't
+        rewind the clock to the start of the move."""
         return cls(
             id=player.id,
             nickname=player.nickname,
             score=player.score,
-            time_remaining_secs=player.time_remaining_secs,
+            time_remaining_secs=(
+                player.time_remaining_secs if time_remaining_secs is None else time_remaining_secs
+            ),
             overtime_count=player.overtime_count,
             connected=connected,
             rack=[TileOut.from_domain(t) for t in player.rack] if is_self else [],
@@ -146,6 +160,11 @@ class GameStateOut(BaseModel):
 
     @classmethod
     def from_domain(cls, state: GameState, *, viewer_id: str, connected_map: dict[str, bool] | None = None) -> GameStateOut:
+        # Only the player on the move is burning time, and only while the game
+        # is actually running. Serializing the live value here covers all three
+        # channels at once (GET, SSE broadcast, SSE initial event). Left as a
+        # float — the frontend does its own ceil for display.
+        live_index = state.current_player_index if state.phase == GamePhase.PLAYING else -1
         return cls(
             code=state.code,
             phase=state.phase,
@@ -157,8 +176,11 @@ class GameStateOut(BaseModel):
                     p,
                     is_self=(p.id == viewer_id),
                     connected=connected_map.get(p.id, False) if connected_map else False,
+                    time_remaining_secs=(
+                        turn_clock.clock.live_remaining(p, state.code) if i == live_index else None
+                    ),
                 )
-                for p in state.players
+                for i, p in enumerate(state.players)
             ],
             current_player_index=state.current_player_index,
             consecutive_passes=state.consecutive_passes,

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from unittest.mock import AsyncMock, patch
 
@@ -10,6 +12,7 @@ from game_engine import PassRequest, PlaceRequest, SwapRequest, Turn
 from backend_api import game_manager, sse_manager, turn_clock
 from backend_api.connection_lifecycle import lifecycle
 from backend_api.services.game_service import GameService  # type: ignore
+from backend_api.turn_clock import TurnClock  # type: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -681,3 +684,28 @@ async def test_overtime_no_op_when_game_over(repo, svc):
     await svc._time_bank_task("ABCD12", "p1", 0.001)
     s = await repo.load_game("ABCD12")
     assert s.phase == GamePhase.FINISHED
+
+
+async def test_overtime_grant_broadcasts_the_refreshed_clock(repo, svc):
+    """The OT grant re-anchors the clock before broadcasting, so the fresh 60s
+    actually reaches the client. Against the stale anchor the view would
+    serialize 60 − full_elapsed ≈ 0 and the grant would look like a no-op."""
+    await repo.save_game(_state())
+
+    now = [0.0]
+    fake = TurnClock(lambda: now[0])
+    fake.mark_turn_started("ABCD12")
+    now[0] = 180.0  # the entire time bank has been burned
+
+    sse_manager.subscribe("ABCD12", "tok1", "p1")
+    try:
+        with patch.object(turn_clock, "clock", fake), \
+             patch("asyncio.sleep", new=AsyncMock()), \
+             patch("asyncio.create_task"), \
+             patch("backend_api.sse_manager.broadcast", new_callable=AsyncMock) as mock_bc:
+            await svc._time_bank_task("ABCD12", "p1", 180.0)
+
+        payload = json.loads(mock_bc.await_args.args[0]["tok1"])
+        assert payload["players"][0]["time_remaining_secs"] == 60.0
+    finally:
+        sse_manager.unsubscribe("ABCD12", "tok1")
