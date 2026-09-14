@@ -402,6 +402,55 @@ async def test_disconnect_player_unknown_player_is_noop(repo, svc):
     assert s.phase == GamePhase.PLAYING
 
 
+async def test_multi_tab_disconnect_does_not_pause_while_tab_still_open(repo, svc):
+    """When a player opens two tabs under the same token and closes one,
+    is_player_connected remains True and the game is not paused."""
+    state = _state()
+    await repo.save_game(state)
+
+    await svc.connect_player("ABCD12", "p1", "tok1")
+    await svc.connect_player("ABCD12", "p1", "tok1")  # Tab 2 in same browser
+    assert lifecycle.is_player_connected("ABCD12", "p1") is True
+
+    await svc.disconnect_player("ABCD12", "p1", "tok1")  # Tab 2 closes
+    assert lifecycle.is_player_connected("ABCD12", "p1") is True
+    assert "p1" not in lifecycle._pending_disconnects.get("ABCD12", {})
+
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+
+    await svc.disconnect_player("ABCD12", "p1", "tok1")  # Tab 1 closes (last connection)
+    assert lifecycle.is_player_connected("ABCD12", "p1") is False
+    assert "p1" in lifecycle._pending_disconnects.get("ABCD12", {})
+
+
+async def test_created_phase_connect_disconnect_cycles_do_not_leak_count(repo, svc):
+    """Connections opened and closed while CREATED must not inflate the count:
+    a later playing-phase disconnect still sees it as the last connection."""
+    state = _state()
+    state.phase = GamePhase.CREATED
+    await repo.save_game(state)
+
+    await svc.connect_player("ABCD12", "p1", "tok1")
+    await svc.disconnect_player("ABCD12", "p1", "tok1")  # closed while CREATED
+    await svc.connect_player("ABCD12", "p1", "tok1")
+    await svc.disconnect_player("ABCD12", "p1", "tok1")
+
+    assert lifecycle.is_player_connected("ABCD12", "p1") is False
+
+    state.phase = GamePhase.PLAYING
+    await repo.save_game(state)
+    await svc.connect_player("ABCD12", "p1", "tok1")  # p1 is back, now mid-game
+    with (
+        patch("backend_api.turn_clock.clock.elapsed", return_value=0.0),
+        patch("backend_api.connection_lifecycle.lifecycle.set_pause_timer"),
+    ):
+        await svc.disconnect_player("ABCD12", "p1", "tok1")
+        await lifecycle._pause_after_grace("ABCD12", "p1", repo, grace_secs=0)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PAUSED
+
+
 async def test_pause_game_freezes_clock_for_active_player(repo, svc):
     state = _state()
     state.current_player_index = 0  # Alice is active

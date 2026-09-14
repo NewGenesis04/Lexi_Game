@@ -24,7 +24,7 @@ class ConnectionLifecycle:
     callback so resume can restart it without coupling here."""
 
     def __init__(self) -> None:
-        self._connections: dict[str, dict[str, set[str]]] = {}
+        self._connections: dict[str, dict[str, int]] = {}
         self._pending_disconnects: dict[str, dict[str, asyncio.Task]] = {}
         self._pause_timers: dict[str, asyncio.Task] = {}
 
@@ -32,28 +32,32 @@ class ConnectionLifecycle:
     # Connected-map primitives
     # ------------------------------------------------------------------
 
-    def add_connection(self, code: str, player_id: str, token: str) -> None:
-        """Register one SSE connection for a player. Cancels any pending disconnect."""
+    def add_connection(self, code: str, player_id: str, token: str = "") -> None:
+        """Register one SSE connection for a player. Cancels any pending disconnect.
+        token is retained for call-site signature compatibility."""
         self.cancel_disconnect_check(code, player_id)
-        self._connections.setdefault(code, {}).setdefault(player_id, set()).add(token)
+        m = self._connections.setdefault(code, {})
+        m[player_id] = m.get(player_id, 0) + 1
 
-    def remove_connection(self, code: str, player_id: str, token: str) -> bool:
-        """Remove one SSE connection. True if the player has no more connections."""
-        conns = self._connections.get(code, {}).get(player_id)
-        if conns is not None:
-            conns.discard(token)
-            if not conns:
-                del self._connections[code][player_id]
-                if not self._connections[code]:
-                    del self._connections[code]
-                return True
+    def remove_connection(self, code: str, player_id: str, token: str = "") -> bool:
+        """Remove one SSE connection. True if the player has no more connections.
+        token is retained for call-site signature compatibility."""
+        m = self._connections.get(code, {})
+        if player_id not in m:
+            return False
+        m[player_id] -= 1
+        if m[player_id] <= 0:
+            del m[player_id]
+            if not m:
+                del self._connections[code]
+            return True
         return False
 
     def is_player_connected(self, code: str, player_id: str) -> bool:
         return bool(self._connections.get(code, {}).get(player_id))
 
     def connected_map(self, code: str) -> dict[str, bool]:
-        return {pid: True for pid in self._connections.get(code, {})}
+        return {pid: True for pid in self._connections.get(code, {}) if self._connections[code][pid] > 0}
 
     # ------------------------------------------------------------------
     # Timer primitives
@@ -118,6 +122,12 @@ class ConnectionLifecycle:
         grace pause. If the player reconnects before the grace timer fires, the
         pause is cancelled. Does nothing if the player was never connected."""
         async with game_manager.get_lock(code):
+            # Always pair with connect()'s add_connection, even when the game is
+            # not PLAYING/PAUSED (connect registers before validating, so a
+            # disconnect during CREATED/FINISHED must decrement too).
+            was_last = self.remove_connection(code, player_id, token)
+            if not was_last:
+                return  # player still has other active connections
             state = await repo.load_game(code)
             if state is None:
                 return
@@ -125,10 +135,6 @@ class ConnectionLifecycle:
                 return
             if not any(p.id == player_id for p in state.players):
                 return
-
-            was_last = self.remove_connection(code, player_id, token)
-            if not was_last:
-                return  # player still has other active connections
 
             if state.phase == GamePhase.PLAYING:
                 task = asyncio.create_task(self._pause_after_grace(code, player_id, repo))
