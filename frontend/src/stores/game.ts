@@ -18,19 +18,42 @@ import {
 import { connectSSE, type SSEConnection } from '../composables/sse'
 
 export const useGameStore = defineStore('game', () => {
-  const saved = localStorage.getItem('lexi_session')
-  let initialSession: PlayerSession | null = null
-  if (saved) {
-    try { initialSession = JSON.parse(saved) } catch { /* corrupt data */ }
-  }
+  const gameCode = ref<string | null>(null)
   const game = ref<GameStateOut | null>(null)
-  const session = ref<PlayerSession | null>(initialSession)
+  const session = ref<PlayerSession | null>(null)
+
+  function sessionKey(code: string): string {
+    return `lexi_session:${code}`
+  }
+
+  function readSession(code: string): PlayerSession | null {
+    const saved = localStorage.getItem(sessionKey(code))
+    if (saved) {
+      try { return JSON.parse(saved) } catch { /* corrupt data */ }
+    }
+    // Read-only legacy fallback
+    const legacy = localStorage.getItem('lexi_session')
+    if (legacy) {
+      try { return JSON.parse(legacy) } catch { /* corrupt data */ }
+    }
+    return null
+  }
+
+  function clearSession(code: string): void {
+    localStorage.removeItem(sessionKey(code))
+  }
+
+  function loadSessionFor(code: string) {
+    gameCode.value = code
+    session.value = readSession(code)
+  }
 
   watch(session, (val) => {
+    if (!gameCode.value) return
     if (val) {
-      localStorage.setItem('lexi_session', JSON.stringify(val))
+      localStorage.setItem(sessionKey(gameCode.value), JSON.stringify(val))
     } else {
-      localStorage.removeItem('lexi_session')
+      clearSession(gameCode.value)
     }
   })
   const connected = ref(false)
@@ -125,6 +148,7 @@ export const useGameStore = defineStore('game', () => {
     avatar?: string,
   ) {
     const res = await apiCreateGame({ nickname, time_per_player_secs, dictionary, avatar })
+    gameCode.value = res.code
     session.value = { token: res.token, player_id: res.player_id, nickname, avatar }
     const state = await apiFetchGame(res.code, res.token)
     updateLocalState(state)
@@ -133,6 +157,7 @@ export const useGameStore = defineStore('game', () => {
 
   async function joinGame(code: string, nickname: string, avatar?: string) {
     const res = await apiJoinGame(code, { nickname, avatar })
+    gameCode.value = code
     session.value = { token: res.token, player_id: res.player_id, nickname, avatar }
     updateLocalState(res.state)
     return res
@@ -211,6 +236,10 @@ export const useGameStore = defineStore('game', () => {
 
   function reset() {
     disconnectSSE()
+    if (gameCode.value) {
+      clearSession(gameCode.value)
+    }
+    gameCode.value = null
     game.value = null
     session.value = null
     toasts.value = []
@@ -218,6 +247,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   return {
+    gameCode,
     game,
     session,
     connected,
@@ -230,6 +260,7 @@ export const useGameStore = defineStore('game', () => {
     addToast,
     clearToasts,
     fetchGameState,
+    loadSessionFor,
     createGame,
     joinGame,
     submitMove,

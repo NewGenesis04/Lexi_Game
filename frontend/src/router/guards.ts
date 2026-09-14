@@ -9,6 +9,7 @@ export async function gameGuard(
   const code = to.params.code as string
 
   store.disconnectSSE()
+  store.loadSessionFor(code)
 
   if (!store.session) {
     store.addToast('You are not in a game session.', 'error')
