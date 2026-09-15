@@ -41,6 +41,20 @@ update it in the same commit; a stale invariants doc is worse than none.
   `_turn_started_at` entry entirely, and `elapsed()` silently falls back to
   ~0 forever until something calls `mark_turn_started()` again. This was
   the root cause of a real "clock jumps back up" bug — always re-anchor.
+- **In-flight turn clocks survive a backend restart via a persisted anchor.**
+  `GameState.active_turn_started_at` (unix epoch, from `turn_clock.clock.wall_now()`)
+  is written whenever the watchdog is (re)spawned — `_start_timer` (turn
+  starts and paused→resume) and the overtime-grant re-anchor — and cleared on
+  pause. Both `_start_timer` invocations must run **before** `save_game`, or
+  the anchor would go out as if the turn just started. At boot,
+  `GameService.reconcile_timers()` charges the downtime into the current
+  player's bank through the engine's `apply_elapsed` one bank-window at a time
+  (a lump sum mis-grants overtime), re-anchors, re-spawns the watchdog, and
+  starts a per-player boot grace to mirror the disconnect invariant. A boot
+  reconcile **never** forfeits a game — the grace freezes it instead; a bank
+  drained to 0 during downtime forfeits only on the player's first move after
+  reconnect. Pre-upgrade states with no anchor are best-effort re-anchored
+  with zero charge.
 - **Rejected-move feedback stays private to the mover.** Don't broadcast
   invalid-word/invalid-placement details (or a generic "opponent made an
   invalid move" notice) to the opponent — a move that never happened isn't
@@ -111,7 +125,7 @@ update it in the same commit; a stale invariants doc is worse than none.
 
 ## Testing / verification
 
-- **Test counts as of this doc**: `packages/backend-api` 94/94,
+- **Test counts as of this doc**: `packages/backend-api` 102/102,
   `packages/game-engine` 79/79. A sudden drop is a regression, not
   flakiness — investigate before re-running.
 - **Browser automation tooling can be flaky** (resize/screenshot timeouts

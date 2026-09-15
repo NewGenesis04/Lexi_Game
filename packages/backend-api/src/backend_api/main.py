@@ -19,6 +19,7 @@ from backend_api import game_manager
 from backend_api.connection_lifecycle import lifecycle
 from backend_api.repositories.game_repo import GameRepo
 from backend_api.routes import events, games
+from backend_api.services.game_service import GameService
 
 load_dotenv()
 
@@ -65,6 +66,8 @@ async def _gc_sweep(repo: GameRepo) -> None:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.redis = aioredis.from_url(_REDIS_URL, decode_responses=True)
     repo = GameRepo(app.state.redis)
+    svc = GameService(repo)
+    await svc.reconcile_timers()
     sweep = asyncio.create_task(_gc_sweep(repo))
     yield
     sweep.cancel()

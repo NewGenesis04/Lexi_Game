@@ -109,9 +109,9 @@ class ConnectionLifecycle:
                 all_connected = all(cmap.get(p.id, False) for p in state.players)
                 if all_connected:
                     self.resume(state)
-                    await repo.save_game(state)
                     if start_timer is not None:
                         start_timer(state)
+                    await repo.save_game(state)
                     await broadcaster.broadcast(state, self.connected_map(state.code))
                     return
 
@@ -156,6 +156,7 @@ class ConnectionLifecycle:
 
         state.paused_time_left = new_time
         state.paused_at = time.time()
+        state.active_turn_started_at = None
         state.phase = GamePhase.PAUSED
 
     def resume(self, state: GameState) -> None:

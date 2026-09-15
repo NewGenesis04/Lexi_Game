@@ -76,3 +76,4 @@ class GameState:
     last_move: Move | None = None
     paused_time_left: float | None = None
     paused_at: float | None = None
+    active_turn_started_at: float | None = None

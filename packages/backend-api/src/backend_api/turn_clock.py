@@ -13,14 +13,20 @@ class TurnClock:
     """Measures elapsed time between turns, per game code.
 
     Process-scoped: one instance serves every game, keyed by game code
-    (never per-request). The monotonic clock is injected at construction so
-    time logic is deterministic to test. It owns only measurement and the
-    thin apply_elapsed delegation; the async sleep-then-fire timer task stays
-    in the service."""
+    (never per-request). Two clocks live behind the seam: a monotonic one for
+    live measurement (it must never jump), and a wall clock for the persisted
+    anchor (it must survive process restarts). Both are injected so time logic
+    is deterministic to test. This module owns only measurement and the thin
+    apply_elapsed delegation; the async sleep-then-fire timer task stays in
+    the service."""
 
-    def __init__(self, clock: ClockFn = time.monotonic) -> None:
+    def __init__(self, clock: ClockFn = time.monotonic, wall: ClockFn = time.time) -> None:
         self._clock = clock
+        self._wall = wall
         self._turn_started_at: dict[str, float] = {}
+
+    def wall_now(self) -> float:
+        return self._wall()
 
     def mark_turn_started(self, code: str) -> None:
         self._turn_started_at[code] = self._clock()

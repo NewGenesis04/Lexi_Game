@@ -68,6 +68,7 @@ def _state_from_dict(d: dict) -> GameState:
         consecutive_passes=d["consecutive_passes"],
         paused_time_left=d["paused_time_left"],
         paused_at=d.get("paused_at"),
+        active_turn_started_at=d.get("active_turn_started_at"),
     )
     raw_board = d["board"]
     state.board = raw_board

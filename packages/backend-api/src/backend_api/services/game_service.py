@@ -96,11 +96,11 @@ class GameService:
             )
             state.phase = GamePhase.PLAYING
 
+            self._start_timer(state)
             await self._repo.save_game(state)
             await self._repo.save_session(token, PlayerSession(
                 token=token, player_id=player_id, game_code=code, nickname=nickname
             ))
-            self._start_timer(state)
             p1, p2 = state.players[0].nickname, state.players[1].nickname
             logger.info(f"Game {code} started: {p1} vs {p2}")
             # Push the started game to whoever's already sitting in the lobby
@@ -159,9 +159,9 @@ class GameService:
                 lifecycle.remove_game(code)
                 return self._to_view(state, viewer_id=player_id)
 
+            self._start_timer(state)
             await self._repo.save_game(state)
             payloads = broadcaster.serialize(state, lifecycle.connected_map(code))
-            self._start_timer(state)
 
             announcement: str | None = None
             notif_type = "success"
@@ -221,6 +221,45 @@ class GameService:
         Delegates to ConnectionLifecycle — safe to call from the SSE generator."""
         await lifecycle.disconnect(code, player_id, token, self._repo)
 
+    async def reconcile_timers(self) -> None:
+        """Boot-time recovery for in-flight turn clocks.
+
+        The watchdog (_time_bank_task) and the monotonic anchor are process
+        memory; after a restart Redis still holds the persisted wall anchor
+        (active_turn_started_at). For every PLAYING game we charge the elapsed
+        downtime into the current player's bank through the engine's overtime
+        math (windowed per bank, exactly as the live timer would have fired),
+        re-anchor, and re-spawn the watchdog. We never forfeit here: a boot
+        grace timer per player decides — reconnecting cancels it, an absent
+        player freezes the game at the post-charge bank.
+        """
+        for code in await self._repo.active_codes():
+            async with game_manager.get_lock(code):
+                state = await self._repo.load_game(code)
+                if state is None or state.phase != GamePhase.PLAYING:
+                    continue
+                anchor = state.active_turn_started_at
+                elapsed = (
+                    max(0.0, turn_clock.clock.wall_now() - anchor)
+                    if anchor is not None
+                    else 0.0
+                )
+                player = state.players[state.current_player_index]
+                self._charge_elapsed_windows(player, elapsed)
+
+                turn_clock.clock.mark_turn_started(code)
+                state.active_turn_started_at = turn_clock.clock.wall_now()
+                await self._repo.save_game(state)
+                # A drained bank must not forfeit at boot: the grace window
+                # decides (freeze on disconnect, forfeit on first move after
+                # reconnect). An immediate 0s watchdog would pre-empt it.
+                if player.time_remaining_secs > 0:
+                    self._start_timer(state)
+
+                for pid in (p.id for p in state.players):
+                    task = asyncio.create_task(lifecycle._pause_after_grace(code, pid, self._repo))
+                    lifecycle.schedule_disconnect_check(code, pid, task)
+
     # -----------------------------------------------------------------------
     # Internal helpers
     # -----------------------------------------------------------------------
@@ -237,6 +276,22 @@ class GameService:
         if state is None:
             raise HTTPException(status_code=404, detail="Game not found")
         return state
+
+    @staticmethod
+    def _charge_elapsed_windows(player: Player, elapsed: float) -> None:
+        """Deduct elapsed real time by stepping through bank-sized windows.
+
+        The engine's apply_elapsed is designed for one call per grant window
+        (the live timer fires once per bank). A single lump call would spend
+        the whole elapsed against one bank and misfire the grant chain, so we
+        replay the 60s grant boundaries. Stops at the forfeit floor: a bank
+        drained to 0 with three overtime grants is debt the grace must decide,
+        not reconcile."""
+        remaining = elapsed
+        while remaining > 0 and player.time_remaining_secs > 0:
+            step = min(remaining, player.time_remaining_secs)
+            turn_clock.clock.apply_elapsed(player, step)
+            remaining -= step
 
     def _raise_move_error(self, result: TurnResult) -> None:
         """Maps engine TurnError values to HTTP responses at the seam."""
@@ -258,6 +313,7 @@ class GameService:
 
     def _start_timer(self, state: GameState) -> None:
         turn_clock.clock.mark_turn_started(state.code)
+        state.active_turn_started_at = turn_clock.clock.wall_now()
         player = state.players[state.current_player_index]
         task = asyncio.create_task(
             self._time_bank_task(state.code, player.id, player.time_remaining_secs)
@@ -286,6 +342,7 @@ class GameService:
                 return
 
             logger.warning(f"Game {code}: OT·{player.overtime_count} granted to {player.nickname} (-10 pts) via timer")
+            state.active_turn_started_at = turn_clock.clock.wall_now()
             await self._repo.save_game(state)
             # Re-anchor before broadcasting: the OT grant resets the bank to 60s,
             # and the view serializes bank − elapsed. Against the stale anchor
