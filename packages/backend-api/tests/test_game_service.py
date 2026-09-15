@@ -451,6 +451,121 @@ async def test_created_phase_connect_disconnect_cycles_do_not_leak_count(repo, s
     assert s.phase == GamePhase.PAUSED
 
 
+# ---------------------------------------------------------------------------
+# reconcile_timers (boot recovery of in-flight clocks)
+# ---------------------------------------------------------------------------
+
+async def _save_active_playing(repo, state):
+    await repo.save_game(state)
+    await repo.register_active(state.code)
+
+
+def _cancel_boot_grace(code, *player_ids):
+    for pid in player_ids:
+        lifecycle.cancel_disconnect_check(code, pid)
+
+
+async def test_reconcile_charges_partial_elapsed(repo, svc):
+    state = _state()
+    state.active_turn_started_at = 1000.0
+    await _save_active_playing(repo, state)
+    with patch.object(turn_clock.clock, "wall_now", return_value=1100.0):
+        await svc.reconcile_timers()
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+    assert s.players[0].time_remaining_secs == 80.0
+    assert s.players[0].overtime_count == 0
+    assert s.active_turn_started_at == 1100.0
+    assert game_manager.set_timer.called
+    _cancel_boot_grace("ABCD12", "p1", "p2")
+
+
+async def test_reconcile_grants_ot_windows(repo, svc):
+    state = _state()
+    state.active_turn_started_at = 1000.0
+    await _save_active_playing(repo, state)
+    with patch.object(turn_clock.clock, "wall_now", return_value=1200.0):
+        await svc.reconcile_timers()
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+    assert s.players[0].overtime_count == 1
+    assert s.players[0].time_remaining_secs == 40.0  # bank + one 60 s grant spent
+    assert s.players[0].score == -10
+    _cancel_boot_grace("ABCD12", "p1", "p2")
+
+
+async def test_reconcile_never_forfeits_at_boot(repo, svc):
+    """Downtime crossing the forfeit threshold must not end the game: the bank
+    drains to 0 with three overtime grants and the boot grace decides."""
+    state = _state()
+    state.active_turn_started_at = 1000.0
+    await _save_active_playing(repo, state)
+    with patch.object(turn_clock.clock, "wall_now", return_value=1400.0):
+        await svc.reconcile_timers()
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PLAYING
+    assert s.players[0].overtime_count == 3
+    assert s.players[0].time_remaining_secs == 0.0
+    assert s.players[0].score == -30
+    assert not s.move_history  # no TIMEOUT move fired
+    assert not game_manager.set_timer.called  # a drained bank must not spawn a 0 s forfeit watchdog
+    assert "p1" in lifecycle._pending_disconnects.get("ABCD12", {})
+    assert "p2" in lifecycle._pending_disconnects.get("ABCD12", {})
+    _cancel_boot_grace("ABCD12", "p1", "p2")
+
+
+async def test_reconcile_grace_pauses_when_nobody_returns(repo, svc):
+    state = _state()
+    state.active_turn_started_at = 1000.0
+    await _save_active_playing(repo, state)
+    with patch.object(turn_clock.clock, "wall_now", return_value=1100.0):
+        await svc.reconcile_timers()
+    with patch("backend_api.turn_clock.clock.elapsed", return_value=0.0):
+        await lifecycle._pause_after_grace("ABCD12", "p1", repo, grace_secs=0)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PAUSED
+    assert s.paused_time_left == 80.0  # post-charge bank frozen
+    assert s.active_turn_started_at is None
+    lifecycle.cancel_disconnect_check("ABCD12", "p2")
+
+
+async def test_reconcile_reconnect_cancels_boot_grace(repo, svc):
+    state = _state()
+    state.active_turn_started_at = 1000.0
+    await _save_active_playing(repo, state)
+    with patch.object(turn_clock.clock, "wall_now", return_value=1100.0):
+        await svc.reconcile_timers()
+    await svc.connect_player("ABCD12", "p1", "tok1")  # p1 is back
+    assert "p1" not in lifecycle._pending_disconnects.get("ABCD12", {})
+    with patch("backend_api.turn_clock.clock.elapsed", return_value=0.0):
+        await lifecycle._pause_after_grace("ABCD12", "p2", repo, grace_secs=0)
+    s = await repo.load_game("ABCD12")
+    assert s.phase == GamePhase.PAUSED
+
+
+async def test_reconcile_skips_non_playing_and_null_anchor(repo, svc):
+    paused = _state()
+    paused.phase = GamePhase.PAUSED
+    paused.paused_time_left = 90.0
+    paused.active_turn_started_at = 1000.0
+    await _save_active_playing(repo, paused)
+
+    fresh = _state("ABCD99")
+    fresh.active_turn_started_at = None  # pre-upgrade state
+    await _save_active_playing(repo, fresh)
+
+    await svc.reconcile_timers()
+
+    assert (await repo.load_game("ABCD12")).phase == GamePhase.PAUSED
+    assert (await repo.load_game("ABCD12")).players[0].time_remaining_secs == 180.0  # untouched
+
+    s = await repo.load_game("ABCD99")
+    assert s.active_turn_started_at is not None  # re-anchored, no false charge
+    assert s.players[0].time_remaining_secs == 180.0
+    assert game_manager.set_timer.called
+    _cancel_boot_grace("ABCD99", "p1", "p2")
+
+
 async def test_pause_game_freezes_clock_for_active_player(repo, svc):
     state = _state()
     state.current_player_index = 0  # Alice is active

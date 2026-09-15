@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import fakeredis
 
@@ -55,6 +57,7 @@ def _make_session() -> PlayerSession:
 
 async def test_save_and_load_game_core_fields(repo):
     state = _make_state()
+    state.active_turn_started_at = 987654.25
     await repo.save_game(state)
     loaded = await repo.load_game(state.code)
     assert loaded is not None
@@ -64,6 +67,18 @@ async def test_save_and_load_game_core_fields(repo):
     assert loaded.current_player_index == 1
     assert loaded.consecutive_passes == 2
     assert loaded.paused_time_left == 45.0
+    assert loaded.active_turn_started_at == 987654.25
+
+
+async def test_load_game_without_anchor_field_returns_none(repo):
+    # A state persisted before active_turn_started_at existed has no key at all.
+    state = _make_state()
+    await repo.save_game(state)
+    d = json.loads(await repo._r.get(f"game:{state.code}"))
+    d.pop("active_turn_started_at", None)  # simulate a legacy stored state
+    await repo._r.set(f"game:{state.code}", json.dumps(d))
+    loaded = await repo.load_game(state.code)
+    assert loaded.active_turn_started_at is None
 
 
 async def test_save_and_load_game_bag(repo):
